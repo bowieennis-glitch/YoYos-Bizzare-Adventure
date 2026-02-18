@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YoYo Shooting Plus</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="hud" class="hud">
+    <div>HP: <span id="hp">100</span></div>
+    <div>Round: <span id="round">1</span></div>
+    <div>Enemies: <span id="remaining">0</span></div>
+  </div>
+
+  <div id="chanceAbilitiesHud" class="chance-abilities hidden" aria-label="Chance ability charges">
+    <div id="chanceAbilityHud" class="chance-ability" aria-label="Chance ability 1 charges">
+      <div class="chance-ability-inner">
+        <div class="chance-ability-num" id="chanceAbilityNum">0</div>
+      </div>
+    </div>
+    <div id="chanceAbilityHud2" class="chance-ability" aria-label="Chance ability 2 charges">
+      <div class="chance-ability-inner">
+        <div class="chance-ability-num" id="chanceAbilityNum2">0</div>
+      </div>
+    </div>
+    <div id="chanceAbilityHud3" class="chance-ability" aria-label="Chance ability 3 charges">
+      <div class="chance-ability-inner">
+        <div class="chance-ability-num" id="chanceAbilityNum3">0</div>
+      </div>
+    </div>
+    <div id="chanceAbilityHud4" class="chance-ability" aria-label="Chance ability 4 charges">
+      <div class="chance-ability-inner">
+        <div class="chance-ability-num" id="chanceAbilityNum4">0</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="chanceWeaknessHud" class="chance-weakness hidden" aria-label="Chance weakness stacks">
+    Weakness: <span id="chanceWeaknessNum">0</span> <span id="chanceWeaknessTime"></span>
+  </div>
+
+  <div id="ryanAbilitiesHud" class="chance-abilities hidden" aria-label="Ryan abilities">
+    <div id="ryanDashHud" class="chance-ability" aria-label="Ryan dash cooldown">
+      <div class="chance-ability-inner">
+        <div class="chance-ability-num" id="ryanDashNum"></div>
+      </div>
+    </div>
+    <div id="ryanNanamiHud" class="chance-ability" aria-label="Ryan nanami cooldown">
+      <div class="chance-ability-inner">
+        <div class="chance-ability-num" id="ryanNanamiNum"></div>
+      </div>
+    </div>
+    <div id="ryanOverflowHud" class="chance-ability" aria-label="Ryan overflow charges">
+      <div class="chance-ability-inner">
+        <div class="chance-ability-num" id="ryanOverflowNum"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="titleOverlay" class="overlay">
+    <div class="panel" id="titlePanel">
+      <h1 class="game-title">YoYo Shooting Plus</h1>
+      <div class="menu">
+        <button id="titlePlayBtn" class="btn">Play</button>
+        <button id="titleManualBtn" class="btn">Manual</button>
+        <button id="titleOptionsBtn" class="btn">Options</button>
+        <button id="titleQuitBtn" class="btn">Quit</button>
+      </div>
+    </div>
+    <div class="panel hidden" id="titleManualPanel">
+      <h2>Manual</h2>
+      <div class="stats" style="margin-top:12px;">
+        <div><b>Goal:</b> survive waves and clear rounds.</div>
+        <div><b>Move:</b> WASD</div>
+        <div><b>Aim:</b> Mouse (or Arrow Aim in Options)</div>
+        <div><b>Shoot:</b> hold left mouse</div>
+        <div><b>Dash:</b> Space (character ability)</div>
+        <div><b>Pause:</b> Esc</div>
+        <div><b>Upgrades:</b> after each round you pick 1 upgrade.</div>
+        <div><b>Ryan:</b> Slash attack + Dash (Space) + Overflow (E) + Nanami (R).</div>
+        <div><b>Overflow:</b> press E to place a puddle (max 3 per round). Enemies inside are slowed and take small tick damage.</div>
+        <div><b>Nanami:</b> press R for 10s buff, then 30s cooldown with a debuff. When cooldown ends, stats return to normal.</div>
+        <div><b>Chance:</b> special abilities and charge HUD on the bottom-right.</div>
+      </div>
+      <div class="actions">
+        <button id="titleManualBackBtn" class="btn">Back</button>
+      </div>
+    </div>
+    <div class="panel hidden" id="titleOptionsPanel">
+      <h2>Options</h2>
+      <div class="stats" style="margin-top:12px;">
+        <div>Default Controls:
+          <label><input type="radio" name="titleControlMode" value="mouse" checked> Mouse Aim</label>
+          <label><input type="radio" name="titleControlMode" value="arrow"> Arrow Aim</label>
+        </div>
+        <div>
+          <label><input type="checkbox" id="titleDefaultTestMode"> Test Mode enabled by default</label>
+        </div>
+        <div>
+          <label><input type="checkbox" id="titleDefaultPinStats"> Stats panel pinned by default</label>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="titleOptionsBackBtn" class="btn">Back</button>
+      </div>
+      <p class="hint">These settings are saved automatically.</p>
+    </div>
+  </div>
+
+  <div id="characterOverlay" class="overlay hidden">
+    <div class="panel" id="characterPanel">
+      <h2>Choose a character</h2>
+      <div id="characterOptions" class="menu"></div>
+      <div class="actions">
+        <button id="characterBackBtn" class="btn">Back</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="upgradeOverlay" class="overlay hidden">
+    <div class="panel">
+      <h2>Choose an Upgrade</h2>
+      <div id="upgradeOptions"></div>
+    </div>
+  </div>
+
+  <div id="messageOverlay" class="overlay hidden">
+    <div class="panel">
+      <h2 id="messageTitle">Message</h2>
+      <p id="messageSubtitle"></p>
+      <button id="restartBtn" class="btn">Restart</button>
+    </div>
+  </div>
+
+  <script src="upgrades.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
