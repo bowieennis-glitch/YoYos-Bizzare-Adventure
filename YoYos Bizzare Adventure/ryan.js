@@ -1,3 +1,5 @@
+
+
 (() => {
   if (typeof window === 'undefined') return;
   if (typeof window.registerCharacter !== 'function') return;
@@ -34,7 +36,9 @@
     nanamiRing: null,
     nanamiNum: null,
     overflowRing: null,
-    overflowNum: null
+    overflowNum: null,
+    dummyRing: null,
+    dummyNum: null
   };
 
   // ==========================================
@@ -73,6 +77,8 @@
     hud.nanamiNum = document.getElementById('ryanNanamiNum');
     hud.overflowRing = document.getElementById('ryanOverflowHud');
     hud.overflowNum = document.getElementById('ryanOverflowNum');
+    hud.dummyRing = document.getElementById('ryanDummyHud');
+    hud.dummyNum = document.getElementById('ryanDummyNum');
   }
 
   function startOverflow(api) {
@@ -193,6 +199,13 @@
       hud.overflowNum.textContent = (left > 0) ? left.toString() : '';
       const p = (OVERFLOW_MAX_PER_ROUND <= 0) ? 1 : (left / OVERFLOW_MAX_PER_ROUND);
       hud.overflowRing.style.setProperty('--p', clamp(p, 0, 1).toFixed(3));
+    }
+
+    if (hud.dummyNum && hud.dummyRing) {
+      const t = clamp(dummyBomb.cdT || 0, 0, DUMMY_BOMB_COOLDOWN_SEC);
+      hud.dummyNum.textContent = (t > 0) ? Math.ceil(t).toString() : '';
+      const p = (DUMMY_BOMB_COOLDOWN_SEC <= 0) ? 1 : (1 - (t / DUMMY_BOMB_COOLDOWN_SEC));
+      hud.dummyRing.style.setProperty('--p', clamp(p, 0, 1).toFixed(3));
     }
   }
 
@@ -506,10 +519,12 @@
     if (dummyBomb.active) {
       ctx.save();
       ctx.globalAlpha = 0.95;
+
       ctx.fillStyle = 'rgba(87,227,154,1)';
       ctx.beginPath();
       ctx.arc(dummyBomb.x, dummyBomb.y, DUMMY_BOMB_R, 0, Math.PI * 2);
       ctx.fill();
+
       const a = clamp((dummyBomb.t || 0) / DUMMY_BOMB_LIFE, 0, 1);
       ctx.globalAlpha = 0.35;
       ctx.strokeStyle = 'rgba(255,255,255,1)';

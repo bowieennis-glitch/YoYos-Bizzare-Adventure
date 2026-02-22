@@ -18,22 +18,27 @@ html,body{margin:0;height:100%;font-family:system-ui,-apple-system,Segoe UI,Robo
 .stats label{margin-right:10px;user-select:none}
 .actions{margin-top:12px}
 
-.chance-abilities{position:fixed;right:16px;bottom:16px;display:flex;gap:12px;align-items:center;padding:10px 12px;border-radius:16px;background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.08);backdrop-filter:blur(6px)}
-.chance-ability{width:66px;height:66px;border-radius:999px;position:relative;display:grid;place-items:center;isolation:isolate;background:conic-gradient(var(--ring, var(--accent)) calc(var(--p,0) * 1turn), rgba(255,255,255,.08) 0);border:1px solid rgba(255,255,255,.14);box-shadow:0 12px 34px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.10)}
-.chance-ability::before{content:"";position:absolute;inset:6px;border-radius:999px;background:radial-gradient(120% 120% at 30% 20%, rgba(255,255,255,.18), rgba(255,255,255,0) 55%), linear-gradient(180deg, rgba(12,16,22,.75), rgba(0,0,0,.35));border:1px solid rgba(255,255,255,.10);box-shadow:inset 0 1px 0 rgba(255,255,255,.08);z-index:0}
-.chance-ability::after{content:"";position:absolute;inset:1px;border-radius:999px;background:radial-gradient(70% 70% at 30% 25%, rgba(255,255,255,.16), rgba(255,255,255,0) 60%);mix-blend-mode:screen;opacity:.55;z-index:1;pointer-events:none}
-.chance-ability-inner{width:52px;height:52px;border-radius:999px;display:grid;place-items:center;position:relative;z-index:2;background:radial-gradient(120% 120% at 35% 25%, rgba(255,255,255,.08), rgba(255,255,255,0) 60%), rgba(0,0,0,.10);border:1px solid rgba(255,255,255,.08)}
-.chance-ability-num{font-weight:950;font-size:20px;letter-spacing:.2px;color:rgba(234,242,247,.98);text-shadow:0 2px 8px rgba(0,0,0,.65), 0 1px 0 rgba(0,0,0,.35)}
+.chance-abilities{position:fixed;right:16px;bottom:16px;display:flex;gap:12px;align-items:center;padding:10px 12px;border-radius:14px;background:rgba(0,0,0,.20);border:1px solid rgba(255,255,255,.08)}
+.chance-ability{width:64px;height:64px;border-radius:999px;position:relative;display:grid;place-items:center;isolation:isolate;background:conic-gradient(var(--ring, var(--accent)) calc(var(--p,0) * 1turn), rgba(255,255,255,.12) 0);border:1px solid rgba(255,255,255,.14)}
+.chance-ability::before{content:"";position:absolute;inset:6px;border-radius:999px;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.08);z-index:0}
+.chance-ability::after{content:none}
+.chance-ability[data-key] .chance-ability-inner::before{content:attr(data-key)}
+.chance-ability[data-key]::marker{content:''}
+.chance-ability[data-key] .chance-ability-inner{position:relative}
+.chance-ability[data-key] .chance-ability-inner::before{position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:900;letter-spacing:.6px;color:rgba(234,242,247,.85);text-transform:uppercase;line-height:1;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.10);border-radius:999px;padding:2px 6px;pointer-events:none}
+.chance-ability-inner{width:52px;height:52px;border-radius:999px;display:grid;place-items:center;position:relative;z-index:2;background:transparent;border:0}
+.chance-ability-num{font-weight:900;font-size:20px;letter-spacing:.1px;color:rgba(234,242,247,.98);text-shadow:none}
 
 #chanceAbilityHud{--ring:#ffd166}
-#chanceAbilityHud2{--ring:#60a5fa}
-#chanceAbilityHud3{--ring:#34d399}
+#chanceAbilityHud2{--ring:#34d399}
+#chanceAbilityHud3{--ring:#60a5fa}
 #chanceAbilityHud4{--ring:#a78bfa}
 
 #ryanAbilitiesHud{--ring:#53d1ff;right:16px;bottom:104px}
 #ryanDashHud{--ring:#53d1ff}
 #ryanNanamiHud{--ring:#ff5c68}
 #ryanOverflowHud{--ring:#ffffff}
+#ryanDummyHud{--ring:#57e39a}
 
 #upgradeOverlay .panel{background:#000}
 
