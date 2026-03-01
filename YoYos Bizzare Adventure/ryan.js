@@ -9,20 +9,22 @@
   // ==========================================
   const DASH_DISTANCE = 120;
   const DASH_COOLDOWN_BASE = 5;
-  const NANAMI_BUFF_SEC = 10;
-  const NANAMI_COOLDOWN_SEC = 20;
-  const OVERFLOW_PUDDLE_LIFE = 10;
-  const OVERFLOW_PUDDLE_R = 70;
-  const OVERFLOW_SLOW_MULT = 0.5;
-  const OVERFLOW_TICK_DPS = 2;
-  const OVERFLOW_MAX_PER_ROUND = 3;
+  const NANAMI_NERF_SEC = 10;
+  const NANAMI_BUFF_SEC = 20;
+  const NANAMI_SHOCKWAVE_R = 120;
+  const NANAMI_STUN_SEC = 0.45;
   const DUMMY_BOMB_LIFE = 3;
   const DUMMY_BOMB_COOLDOWN_SEC = 15;
   const DUMMY_BOMB_R = 18;
   const DUMMY_BOMB_EXPLODE_R = 110;
   const DUMMY_BOMB_DAMAGE_MULT = 8;
   const SWING_COOLDOWN = 0.5;
-  const SWING_LIFE = 0.5;
+  const SWING_LIFE = 0.28;
+  const SWORD_SPEED = 760;
+  const SWORD_R = 42;
+  const SWORD_DAMAGE_MULT = 3.25;
+  const SWORD_HIT_COOLDOWN = 0.18;
+  const SWORD_COOLDOWN_SEC = 5;
   const BASE_CRIT_CHANCE = 0.20;
   const BLEED_DURATION = 2;
   const SPARK_COUNT = 0;
@@ -33,10 +35,10 @@
     root: null,
     ring: null,
     num: null,
+    swordRing: null,
+    swordNum: null,
     nanamiRing: null,
     nanamiNum: null,
-    overflowRing: null,
-    overflowNum: null,
     dummyRing: null,
     dummyNum: null
   };
@@ -45,9 +47,6 @@
   // STATE
   // ==========================================
   let slashes = [];
-  let puddles = [];
-  let overflowUsedThisRound = 0;
-  let overflowRound = 0;
 
   const dummyBomb = {
     active: false,
@@ -58,13 +57,28 @@
   };
 
   const nanami = {
-    buffT: 0,
-    cdT: 0,
+    phase: 'none',
+    t: 0,
     dmgMult: 1,
     intervalMult: 1,
     rangeMult: 1,
     maxHpMult: 1,
     damageTakenMult: 1
+  };
+
+  const sword = {
+    active: false,
+    phase: 'out',
+    x: 0,
+    y: 0,
+    vx: 0,
+    vy: 0,
+    dist: 0,
+    maxDist: 0,
+    ang: 0,
+    recentHits: new Map(),
+    trail: [],
+    cdT: 0
   };
 
   function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
@@ -73,31 +87,46 @@
     hud.root = document.getElementById('ryanAbilitiesHud');
     hud.ring = document.getElementById('ryanDashHud');
     hud.num = document.getElementById('ryanDashNum');
+    hud.swordRing = document.getElementById('ryanSwordHud');
+    hud.swordNum = document.getElementById('ryanSwordNum');
     hud.nanamiRing = document.getElementById('ryanNanamiHud');
     hud.nanamiNum = document.getElementById('ryanNanamiNum');
-    hud.overflowRing = document.getElementById('ryanOverflowHud');
-    hud.overflowNum = document.getElementById('ryanOverflowNum');
     hud.dummyRing = document.getElementById('ryanDummyHud');
     hud.dummyNum = document.getElementById('ryanDummyNum');
   }
 
-  function startOverflow(api) {
+  function hasActiveSword() {
+    return !!sword.active;
+  }
+
+  function startSword(api) {
     if (api.state.phase !== 'playing') return false;
-    if ((api.enemies || []).length <= 0) return false;
+    if (hasActiveSword()) return false;
+    if ((sword.cdT || 0) > 0) return false;
 
-    const curRound = Math.max(1, Math.floor(api.state.round || 1));
-    if (overflowRound !== curRound) {
-      overflowRound = curRound;
-      overflowUsedThisRound = 0;
-    }
-    if (overflowUsedThisRound >= OVERFLOW_MAX_PER_ROUND) return false;
+    const { player, state, input, aim, norm } = api;
+    const dx = (state.controlMode === 'mouse' ? input.mouse.x : aim.x) - player.x;
+    const dy = (state.controlMode === 'mouse' ? input.mouse.y : aim.y) - player.y;
+    const d = norm(dx, dy);
+    const nx = d[0];
+    const ny = d[1];
+    if (!isFinite(nx) || !isFinite(ny) || (nx === 0 && ny === 0)) return false;
 
-    overflowUsedThisRound += 1;
-    const x = api.player.x;
-    const y = api.player.y;
-    puddles.push({ x, y, r: OVERFLOW_PUDDLE_R, life: OVERFLOW_PUDDLE_LIFE, maxLife: OVERFLOW_PUDDLE_LIFE, seed: Math.random() * 1000 });
+    sword.active = true;
+    sword.phase = 'out';
+    sword.x = player.x + nx * (player.r + 10);
+    sword.y = player.y + ny * (player.r + 10);
+    sword.vx = nx * SWORD_SPEED;
+    sword.vy = ny * SWORD_SPEED;
+    sword.dist = 0;
+    sword.maxDist = Math.max(200, (player.range || 0));
+    sword.ang = 0;
+    sword.recentHits.clear();
+    sword.trail.length = 0;
+    updateHud(api);
     return true;
   }
+
 
   function startDummyBomb(api) {
     if (api.state.phase !== 'playing') return false;
@@ -147,17 +176,16 @@
   }
 
   function startNanami(api) {
-    if ((nanami.buffT || 0) > 0) return false;
-    if ((nanami.cdT || 0) > 0) return false;
+    if (nanami.phase !== 'none') return false;
 
-    nanami.buffT = NANAMI_BUFF_SEC;
-    nanami.cdT = 0;
+    nanami.phase = 'nerf';
+    nanami.t = NANAMI_NERF_SEC;
     applyNanamiMultipliers(api, {
-      dmgMult: 1.3,
-      intervalMult: 1 / 1.3,
-      rangeMult: 1.3,
-      maxHpMult: 1.3,
-      damageTakenMult: 1 / 1.3
+      dmgMult: 0.7,
+      intervalMult: 1 / 0.7,
+      rangeMult: 0.7,
+      maxHpMult: 0.7,
+      damageTakenMult: 1 / 0.7
     });
     updateHud(api);
     return true;
@@ -181,24 +209,24 @@
     }
 
     if (hud.nanamiNum && hud.nanamiRing) {
-      const bt = clamp(nanami.buffT || 0, 0, NANAMI_BUFF_SEC);
-      const ct = clamp(nanami.cdT || 0, 0, NANAMI_COOLDOWN_SEC);
-      const isBuff = bt > 0;
-      const isCd = !isBuff && ct > 0;
-      const t = isBuff ? bt : (isCd ? ct : 0);
-      const total = isBuff ? NANAMI_BUFF_SEC : (isCd ? NANAMI_COOLDOWN_SEC : 0);
+      const total = NANAMI_NERF_SEC + NANAMI_BUFF_SEC;
+      const t = (nanami.phase === 'none') ? 0 : clamp(nanami.t || 0, 0, total);
       hud.nanamiNum.textContent = (t > 0) ? Math.ceil(t).toString() : '';
       const p = (total <= 0) ? 1 : (1 - (t / total));
       hud.nanamiRing.style.setProperty('--p', clamp(p, 0, 1).toFixed(3));
     }
 
-    if (hud.overflowNum && hud.overflowRing) {
-      const curRound = Math.max(1, Math.floor(state.round || 1));
-      const used = (overflowRound === curRound) ? overflowUsedThisRound : 0;
-      const left = clamp(OVERFLOW_MAX_PER_ROUND - used, 0, OVERFLOW_MAX_PER_ROUND);
-      hud.overflowNum.textContent = (left > 0) ? left.toString() : '';
-      const p = (OVERFLOW_MAX_PER_ROUND <= 0) ? 1 : (left / OVERFLOW_MAX_PER_ROUND);
-      hud.overflowRing.style.setProperty('--p', clamp(p, 0, 1).toFixed(3));
+    if (hud.swordNum && hud.swordRing) {
+      if (!hasActiveSword()) {
+        const t = clamp(sword.cdT || 0, 0, SWORD_COOLDOWN_SEC);
+        hud.swordNum.textContent = (t > 0) ? Math.ceil(t).toString() : '';
+        const p = (SWORD_COOLDOWN_SEC <= 0) ? 1 : (1 - (t / SWORD_COOLDOWN_SEC));
+        hud.swordRing.style.setProperty('--p', clamp(p, 0, 1).toFixed(3));
+      } else {
+        const p = (sword.maxDist <= 0) ? 0 : clamp(sword.dist / sword.maxDist, 0, 1);
+        hud.swordNum.textContent = '';
+        hud.swordRing.style.setProperty('--p', (1 - p).toFixed(3));
+      }
     }
 
     if (hud.dummyNum && hud.dummyRing) {
@@ -300,64 +328,91 @@
   };
 
   // ==========================================
-  // MAIN SLASH FUNCTION
-  // ==========================================
-  const doSlash = (api) => {
-    const { player, state, input, aim, enemies, hitTexts, norm, registerKill, rand, vfx, spawnExplosionVfx, circleRectIntersect } = api;
-    
+
+  function doSlash(api) {
+    const { player, state, input, aim, norm, enemies, hitTexts, rand, registerKill, vfx } = api;
+
+    // Ryan can't attack while sword is in motion
+    if (hasActiveSword()) return;
+
     // Calculate slash direction
     const dx = (state.controlMode === 'mouse' ? input.mouse.x : aim.x) - player.x;
     const dy = (state.controlMode === 'mouse' ? input.mouse.y : aim.y) - player.y;
-    const [nx, ny] = norm(dx, dy);
+    const d = norm(dx, dy);
+    const nx = d[0];
+    const ny = d[1];
     const slashAngle = Math.atan2(ny, nx);
-    
+
     // Calculate slash stats
     const slashRange = Math.max(60, (player.range || 0) * 0.2) + (player.pierce || 0) * 12;
     const slashArc = Math.max(0.001, Math.PI * 0.9 - (60 * Math.PI / 180));
-    
+
     // Roll crit once for this slash
     const critChance = getCritChance(player);
     const critMult = getCritMultiplier(player);
     const isCrit = Math.random() < critChance;
-    
+
     // Track hit enemies to prevent double-hits
     const hitEnemies = new Set();
     const baseDamage = player.damage * 2;
-    
+
     // Check each enemy
     for (const enemy of enemies) {
-      if (enemy.hp <= 0) continue;
-      
+      if (!enemy || enemy.hp <= 0) continue;
+
       const cx = enemy.x + enemy.w / 2;
       const cy = enemy.y + enemy.h / 2;
       const enemyRadius = Math.max(enemy.w, enemy.h) * 0.5;
-      
+
       // Check if enemy is in slash arc (with padding for enemy radius)
-      if (!isPointInArc(cx, cy, player.x, player.y, slashAngle, slashRange + enemyRadius, slashArc)) {
-        continue;
-      }
-      
+      if (!isPointInArc(cx, cy, player.x, player.y, slashAngle, slashRange + enemyRadius, slashArc)) continue;
+
       if (hitEnemies.has(enemy)) continue;
       hitEnemies.add(enemy);
-      
+
       // Apply damage
       applySlashDamage(api, enemy, isCrit, critMult);
       applyBleedEffect(api, enemy, isCrit);
       applyExplosionDamage(api, enemy, baseDamage, hitTexts, registerKill);
     }
-    
+
     // Create slash visual
     slashes.push({
       ox: player.x, oy: player.y,
       ang: slashAngle, arc: slashArc, r: slashRange,
       life: SWING_LIFE, maxLife: SWING_LIFE
     });
-    
+
+    // Nanami shockwave: stun nearby enemies after each attack
+    if (nanami.phase === 'buff') {
+      const x = player.x;
+      const y = player.y;
+      const life = 0.22;
+      vfx.push({
+        kind: 'ring', x, y,
+        r: 0,
+        dr: NANAMI_SHOCKWAVE_R / life,
+        life,
+        maxLife: life,
+        color: 'rgba(255,255,255,0.95)',
+        width: 4
+      });
+      for (const e of enemies) {
+        if (!e || e.hp <= 0) continue;
+        const cx = e.x + e.w / 2;
+        const cy = e.y + e.h / 2;
+        const dist = Math.hypot(cx - x, cy - y);
+        if (dist <= NANAMI_SHOCKWAVE_R) {
+          e.stunT = Math.max(e.stunT || 0, NANAMI_STUN_SEC);
+        }
+      }
+    }
+
     // Set cooldown
     const baseInterval = 0.16;
     const rateMult = Math.max(0.15, (player.shotInterval || baseInterval) / baseInterval);
     player.shotCooldown = Math.max(0.12, SWING_COOLDOWN * rateMult);
-    
+
     // Spawn slash VFX sparks
     for (let i = 0; i < SPARK_COUNT; i++) {
       const a = slashAngle + rand(-slashArc * 0.5, slashArc * 0.5);
@@ -373,7 +428,7 @@
         color: Math.random() < 0.6 ? 'rgba(83,209,255,1)' : 'rgba(245,247,255,1)'
       });
     }
-  };
+  }
 
   const dash = (api) => {
     const { player, canvas, clamp, rand, vfx, enemies, circleRectIntersect, damagePlayer } = api;
@@ -435,6 +490,64 @@
       if (slashes[i].life <= 0) slashes.splice(i, 1);
     }
 
+    // Sword hit cooldown decay
+    if (sword.recentHits && sword.recentHits.size > 0) {
+      for (const [k, v] of sword.recentHits.entries()) {
+        const nv = v - dt;
+        if (nv <= 0) sword.recentHits.delete(k);
+        else sword.recentHits.set(k, nv);
+      }
+    }
+
+    if ((sword.cdT || 0) > 0) sword.cdT = Math.max(0, (sword.cdT || 0) - dt);
+
+    // Sword movement + collision
+    if (sword.active) {
+      const mx = sword.vx * dt;
+      const my = sword.vy * dt;
+      sword.x += mx;
+      sword.y += my;
+      sword.dist += Math.hypot(mx, my);
+      sword.ang += dt * 14;
+
+      sword.trail.push({ x: sword.x, y: sword.y, a: sword.ang });
+      if (sword.trail.length > 14) sword.trail.shift();
+
+      if (sword.phase === 'out' && sword.dist >= sword.maxDist) {
+        sword.phase = 'back';
+      }
+
+      if (sword.phase === 'back') {
+        const dx = api.player.x - sword.x;
+        const dy = api.player.y - sword.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const nx = dx / d;
+        const ny = dy / d;
+        sword.vx = nx * SWORD_SPEED;
+        sword.vy = ny * SWORD_SPEED;
+        if (d <= api.player.r + 30) {
+          sword.active = false;
+          sword.cdT = SWORD_COOLDOWN_SEC;
+          updateHud(api);
+        }
+      }
+
+      // Damage enemies on contact
+      for (const e of api.enemies) {
+        if (!e || e.hp <= 0) continue;
+        const key = e;
+        if ((sword.recentHits.get(key) || 0) > 0) continue;
+        if (api.circleRectIntersect(sword.x, sword.y, SWORD_R, e.x, e.y, e.w, e.h)) {
+          const wasAlive = e.hp > 0;
+          const dmg = (api.player.damage || 1) * SWORD_DAMAGE_MULT;
+          e.hp -= dmg;
+          api.hitTexts.push({ x: sword.x, y: sword.y, text: '-' + dmg, life: 0.6, vy: -30 });
+          if (wasAlive && e.hp <= 0) api.registerKill();
+          sword.recentHits.set(key, SWORD_HIT_COOLDOWN);
+        }
+      }
+    }
+
     if ((dummyBomb.cdT || 0) > 0) dummyBomb.cdT = Math.max(0, (dummyBomb.cdT || 0) - dt);
     if (dummyBomb.active) {
       dummyBomb.t = Math.max(0, (dummyBomb.t || 0) - dt);
@@ -445,65 +558,41 @@
       }
     }
 
-    const curRound = Math.max(1, Math.floor(api.state.round || 1));
-    if (overflowRound !== curRound) {
-      overflowRound = curRound;
-      overflowUsedThisRound = 0;
+    if (nanami.phase !== 'none') {
+      nanami.t = Math.max(0, (nanami.t || 0) - dt);
+      if (nanami.t <= 0) {
+        if (nanami.phase === 'nerf') {
+          nanami.phase = 'buff';
+          nanami.t = NANAMI_BUFF_SEC;
+          applyNanamiMultipliers(api, {
+            dmgMult: 1.3,
+            intervalMult: 1 / 1.3,
+            rangeMult: 1.3,
+            maxHpMult: 1.3,
+            damageTakenMult: 1 / 1.3
+          });
+        } else {
+          nanami.phase = 'none';
+          nanami.t = 0;
+          applyNanamiMultipliers(api, {
+            dmgMult: 1,
+            intervalMult: 1,
+            rangeMult: 1,
+            maxHpMult: 1,
+            damageTakenMult: 1
+          });
+        }
+        updateHud(api);
+      }
     }
 
-    for (let i = puddles.length - 1; i >= 0; i--) {
-      const p = puddles[i];
-      p.life -= dt;
-      if (p.life <= 0) puddles.splice(i, 1);
-    }
-
-    for (const e of api.enemies) {
-      if (!e || e.hp <= 0) continue;
-      let inAny = false;
-      const ex = e.x + e.w / 2;
-      const ey = e.y + e.h / 2;
-      for (const p of puddles) {
-        const d = Math.hypot(ex - p.x, ey - p.y);
-        if (d <= p.r) { inAny = true; break; }
-      }
-      if (inAny) {
-        e.speedMult = Math.min((typeof e.speedMult === 'number' ? e.speedMult : 1), OVERFLOW_SLOW_MULT);
-        const wasAlive = e.hp > 0;
-        e.hp -= OVERFLOW_TICK_DPS * dt;
-        if (wasAlive && e.hp <= 0) api.registerKill();
-      }
-    }
-
-    if ((nanami.buffT || 0) > 0) {
-      nanami.buffT = Math.max(0, (nanami.buffT || 0) - dt);
-      if (nanami.buffT <= 0) {
-        nanami.cdT = NANAMI_COOLDOWN_SEC;
-        applyNanamiMultipliers(api, {
-          dmgMult: 0.7,
-          intervalMult: 1 / 0.7,
-          rangeMult: 0.7,
-          maxHpMult: 0.7,
-          damageTakenMult: 1 / 0.7
-        });
-      }
-    } else if ((nanami.cdT || 0) > 0) {
-      nanami.cdT = Math.max(0, (nanami.cdT || 0) - dt);
-      if (nanami.cdT <= 0) {
-        applyNanamiMultipliers(api, {
-          dmgMult: 1,
-          intervalMult: 1,
-          rangeMult: 1,
-          maxHpMult: 1,
-          damageTakenMult: 1
-        });
-      }
-    }
+    updateHud(api);
   };
 
   function onKeyDown(api, e) {
     if (api.state.phase === 'title' || api.state.phase === 'character') return false;
     if (e.code === 'KeyR') return startNanami(api);
-    if (e.code === 'KeyE') return startOverflow(api);
+    if (e.code === 'KeyE') return startSword(api);
     if (e.code === 'KeyQ') return startDummyBomb(api);
     return false;
   }
@@ -515,6 +604,72 @@
 
   const draw = (api) => {
     const { ctx, clamp, player } = api;
+
+    if (sword.active) {
+      if (sword.trail && sword.trail.length > 1) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < sword.trail.length; i++) {
+          const t = sword.trail[i];
+          const a = (i + 1) / sword.trail.length;
+          ctx.globalAlpha = 0.05 + a * 0.22;
+          ctx.strokeStyle = 'rgba(83,209,255,1)';
+          ctx.lineWidth = 2 + a * 6;
+          ctx.beginPath();
+          ctx.arc(t.x, t.y, SWORD_R * 0.55, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      ctx.save();
+      ctx.translate(sword.x, sword.y);
+      ctx.rotate(sword.ang);
+      ctx.globalCompositeOperation = 'lighter';
+
+      // outer glow
+      ctx.globalAlpha = 0.55;
+      ctx.shadowColor = 'rgba(83,209,255,0.9)';
+      ctx.shadowBlur = 18;
+      ctx.strokeStyle = 'rgba(83,209,255,0.85)';
+      ctx.lineWidth = 10;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(0, 0, SWORD_R * 0.55, -Math.PI * 0.22, Math.PI * 0.22);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, SWORD_R * 0.55, Math.PI - Math.PI * 0.22, Math.PI + Math.PI * 0.22);
+      ctx.stroke();
+
+      // blade
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 0.98;
+      ctx.strokeStyle = 'rgba(245,247,255,0.95)';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(-SWORD_R * 0.95, 0);
+      ctx.lineTo(SWORD_R * 0.95, 0);
+      ctx.stroke();
+
+      // inner cross flare
+      ctx.globalAlpha = 0.85;
+      ctx.strokeStyle = 'rgba(83,209,255,0.85)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(0, -SWORD_R * 0.75);
+      ctx.lineTo(0, SWORD_R * 0.75);
+      ctx.stroke();
+
+      // spinning ring
+      ctx.globalAlpha = 0.35;
+      ctx.strokeStyle = 'rgba(245,247,255,0.7)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, SWORD_R * 0.9, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.restore();
+    }
 
     if (dummyBomb.active) {
       ctx.save();
@@ -532,31 +687,6 @@
       ctx.beginPath();
       ctx.arc(dummyBomb.x, dummyBomb.y, DUMMY_BOMB_R + 7 + (1 - a) * 10, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.restore();
-    }
-
-    if (puddles.length > 0) {
-      ctx.save();
-      for (const p of puddles) {
-        const a = clamp(p.life / (p.maxLife || 0.001), 0, 1);
-        ctx.globalAlpha = a;
-        ctx.fillStyle = 'rgba(255,255,255,1)';
-        const seed = (typeof p.seed === 'number') ? p.seed : 0;
-        const baseR = p.r;
-        const lobes = 10;
-        ctx.beginPath();
-        for (let i = 0; i <= lobes; i++) {
-          const t = (i / lobes) * Math.PI * 2;
-          const wobble = 0.78 + 0.22 * Math.sin(t * 3 + seed) + 0.10 * Math.sin(t * 7 + seed * 0.37);
-          const rr = baseR * wobble;
-          const xx = p.x + Math.cos(t) * rr;
-          const yy = p.y + Math.sin(t) * rr * 0.78;
-          if (i === 0) ctx.moveTo(xx, yy);
-          else ctx.lineTo(xx, yy);
-        }
-        ctx.closePath();
-        ctx.fill();
-      }
       ctx.restore();
     }
 
@@ -590,8 +720,13 @@
     name: 'Ryan',
     color: '#57e39a',
     hpColor: '#53d1ff',
-    init: (api) => { ensureHudRefs(); updateHud(api); },
-    fire: (api) => doSlash(api),
+    init: (api) => {
+      api.player.damage *= 3;
+      api.player.shotInterval = Math.max(0.05, api.player.shotInterval / 0.2);
+      ensureHudRefs();
+      updateHud(api);
+    },
+    fire: (api) => { if (!hasActiveSword()) doSlash(api); },
     dash: (api) => dash(api),
     update: (api, dt) => update(api, dt),
     draw: (api) => draw(api),

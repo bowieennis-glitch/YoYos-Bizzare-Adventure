@@ -11,6 +11,11 @@
 
   <div id="hud" class="hud">
     <div>HP: <span id="hp">100</span></div>
+    <div id="slotRolls" class="slot-rolls hidden">
+      <span class="slot-roll-item" id="hudRollDmg" title="Damage roll">⚔️0</span>
+      <span class="slot-roll-item" id="hudRollFire" title="Fire rate roll">⚡0</span>
+      <span class="slot-roll-item" id="hudRollHp" title="Health roll">❤️0</span>
+    </div>
     <div>Round: <span id="round">1</span></div>
     <div>Enemies: <span id="remaining">0</span></div>
   </div>
@@ -48,14 +53,14 @@
         <div class="chance-ability-num" id="ryanDashNum"></div>
       </div>
     </div>
+    <div id="ryanSwordHud" class="chance-ability" aria-label="Ryan sword throw" data-key="E">
+      <div class="chance-ability-inner">
+        <div class="chance-ability-num" id="ryanSwordNum"></div>
+      </div>
+    </div>
     <div id="ryanDummyHud" class="chance-ability" aria-label="Ryan dummy bomb cooldown" data-key="Q">
       <div class="chance-ability-inner">
         <div class="chance-ability-num" id="ryanDummyNum"></div>
-      </div>
-    </div>
-    <div id="ryanOverflowHud" class="chance-ability" aria-label="Ryan overflow charges" data-key="E">
-      <div class="chance-ability-inner">
-        <div class="chance-ability-num" id="ryanOverflowNum"></div>
       </div>
     </div>
     <div id="ryanNanamiHud" class="chance-ability" aria-label="Ryan nanami cooldown" data-key="R">
@@ -85,8 +90,7 @@
         <div><b>Dash:</b> Space (character ability)</div>
         <div><b>Pause:</b> Esc</div>
         <div><b>Upgrades:</b> after each round you pick 1 upgrade.</div>
-        <div><b>Ryan:</b> Slash attack + Dash (Space) + Overflow (E) + Nanami (R).</div>
-        <div><b>Overflow:</b> press E to place a puddle (max 3 per round). Enemies inside are slowed and take small tick damage.</div>
+        <div><b>Ryan:</b> Slash attack + Dash (Space) + Nanami (R) + Dummy Bomb (Q).</div>
         <div><b>Nanami:</b> press R for 10s buff, then 30s cooldown with a debuff. When cooldown ends, stats return to normal.</div>
         <div><b>Chance:</b> special abilities and charge HUD on the bottom-right.</div>
       </div>
@@ -129,6 +133,35 @@
     <div class="panel">
       <h2>Choose an Upgrade</h2>
       <div id="upgradeOptions"></div>
+    </div>
+  </div>
+
+  <div id="slotOverlay" class="overlay hidden">
+    <div class="panel">
+      <h2>Chance Slots</h2>
+      <div id="slotReels" class="slot-reels" aria-label="Slot machine reels">
+        <div class="slot-reel">
+          <div class="slot-label">Damage</div>
+          <div class="slot-symbol" id="slotSymbol1">?</div>
+          <div class="slot-value" id="slotValue1"></div>
+        </div>
+        <div class="slot-reel">
+          <div class="slot-label">Fire Rate</div>
+          <div class="slot-symbol" id="slotSymbol2">?</div>
+          <div class="slot-value" id="slotValue2"></div>
+        </div>
+        <div class="slot-reel">
+          <div class="slot-label">Health</div>
+          <div class="slot-symbol" id="slotSymbol3">?</div>
+          <div class="slot-value" id="slotValue3"></div>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="slotSpinBtn" class="btn">Spin</button>
+        <button id="slotRerollBtn" class="btn" disabled>Reroll</button>
+        <button id="slotKeepBtn" class="btn" disabled>Keep Stats</button>
+        <button id="slotStartBtn" class="btn" disabled>Start Round</button>
+      </div>
     </div>
   </div>
 

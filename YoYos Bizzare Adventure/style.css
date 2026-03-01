@@ -19,12 +19,13 @@ html,body{margin:0;height:100%;font-family:system-ui,-apple-system,Segoe UI,Robo
 .actions{margin-top:12px}
 
 .chance-abilities{position:fixed;right:16px;bottom:16px;display:flex;gap:12px;align-items:center;padding:10px 12px;border-radius:14px;background:rgba(0,0,0,.20);border:1px solid rgba(255,255,255,.08)}
-.chance-ability{width:64px;height:64px;border-radius:999px;position:relative;display:grid;place-items:center;isolation:isolate;background:conic-gradient(var(--ring, var(--accent)) calc(var(--p,0) * 1turn), rgba(255,255,255,.12) 0);border:1px solid rgba(255,255,255,.14)}
+.chance-ability{width:64px;height:64px;border-radius:999px;position:relative;display:grid;place-items:center;isolation:isolate;background:conic-gradient(var(--ring, var(--accent)) calc(var(--p,0) * 1turn), rgba(255,255,255,.12) 0);border:1px solid rgba(255,255,255,.14);box-shadow:0 0 0 4px rgba(255,255,255,.95)}
 .chance-ability::before{content:"";position:absolute;inset:6px;border-radius:999px;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.08);z-index:0}
 .chance-ability::after{content:none}
 .chance-ability[data-key] .chance-ability-inner::before{content:attr(data-key)}
 .chance-ability[data-key]::marker{content:''}
 .chance-ability[data-key] .chance-ability-inner{position:relative}
+
 .chance-ability[data-key] .chance-ability-inner::before{position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:900;letter-spacing:.6px;color:rgba(234,242,247,.85);text-transform:uppercase;line-height:1;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.10);border-radius:999px;padding:2px 6px;pointer-events:none}
 .chance-ability-inner{width:52px;height:52px;border-radius:999px;display:grid;place-items:center;position:relative;z-index:2;background:transparent;border:0}
 .chance-ability-num{font-weight:900;font-size:20px;letter-spacing:.1px;color:rgba(234,242,247,.98);text-shadow:none}
@@ -36,13 +37,56 @@ html,body{margin:0;height:100%;font-family:system-ui,-apple-system,Segoe UI,Robo
 
 #ryanAbilitiesHud{--ring:#53d1ff;right:16px;bottom:104px}
 #ryanDashHud{--ring:#53d1ff}
+#ryanSwordHud{--ring:#ffffff}
 #ryanNanamiHud{--ring:#ff5c68}
-#ryanOverflowHud{--ring:#ffffff}
 #ryanDummyHud{--ring:#57e39a}
 
-#upgradeOverlay .panel{background:#000}
+#upgradeOverlay .panel{min-width:420px;padding:28px;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+#upgradeOptions{display:grid;grid-template-columns:1fr;gap:14px;margin-top:16px}
+
+.upgrade-card{position:relative;display:flex;align-items:stretch;width:100%;min-height:100px;background:linear-gradient(145deg,#0f1218,#1a1f28);border:2px solid transparent;border-radius:12px;padding:0;overflow:hidden;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease;text-align:left;appearance:none;font-family:inherit}
+.upgrade-card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.upgrade-card:active{transform:translateY(-1px)}
+
+.upgrade-rarity-strip{width:6px;flex-shrink:0;border-radius:12px 0 0 12px;opacity:.9}
+.upgrade-content{flex:1;padding:16px 18px;display:flex;flex-direction:column;justify-content:center}
+
+.upgrade-header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.upgrade-rarity{font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;opacity:.9}
+
+.upgrade-title{font-size:16px;font-weight:800;letter-spacing:.2px;color:#fff;margin-bottom:6px;line-height:1.3}
+.upgrade-desc{font-size:13px;font-weight:500;color:rgba(234,242,247,.75);line-height:1.5}
+
+/* Hover glow effect based on rarity */
+.upgrade-card[data-rarity="common"]:hover{box-shadow:0 8px 24px rgba(168,226,255,.15)}
+.upgrade-card[data-rarity="uncommon"]:hover{box-shadow:0 8px 24px rgba(93,255,170,.15)}
+.upgrade-card[data-rarity="rare"]:hover{box-shadow:0 8px 24px rgba(141,140,255,.2)}
+.upgrade-card[data-rarity="legendary"]:hover{box-shadow:0 8px 28px rgba(255,201,91,.25)}
 
 .chance-weakness{position:fixed;left:16px;bottom:16px;padding:8px 10px;border-radius:10px;background:rgba(0,0,0,.32);border:1px solid rgba(255,255,255,.10);font-weight:800;letter-spacing:.4px;font-size:12px;backdrop-filter:blur(4px)}
+
+.slot-reels{display:grid;grid-template-columns:repeat(3,minmax(90px,1fr));gap:14px;margin-top:16px}
+.slot-reel{background:linear-gradient(145deg,#0f1218,#1a1f28);border:1px solid rgba(255,255,255,.10);border-radius:14px;padding:12px 10px;display:grid;gap:8px;align-items:center;justify-items:center;min-width:90px}
+.slot-label{font-size:12px;font-weight:900;letter-spacing:.8px;opacity:.85;text-transform:uppercase}
+.slot-symbol{font-size:42px;line-height:1;font-weight:900;min-height:46px;display:grid;place-items:center;width:100%;border-radius:12px;background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.10)}
+.slot-value{font-size:14px;font-weight:900;letter-spacing:.8px;opacity:.9;min-height:16px}
+#slotOverlay .panel{min-width:520px;max-width:92vw}
+#slotOverlay .actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+#slotOverlay .btn{min-width:100px}
+#slotRerollBtn,
+#slotKeepBtn{visibility:hidden}
+.slot-counters{display:flex;gap:12px;justify-content:center;margin-top:8px;font-size:12px;font-weight:700;opacity:.9}
+.slot-counter{padding:4px 10px;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.12);border-radius:999px}
+.slot-counter.has-charge{background:rgba(83,209,255,.15);border-color:rgba(83,209,255,.35)}
+
+.slot-rolls{display:flex;gap:8px;align-items:center;padding:4px 10px;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.12);border-radius:8px;backdrop-filter:blur(4px)}
+.slot-roll-item{font-size:12px;font-weight:800;letter-spacing:.3px;transition:transform .2s ease,filter .2s ease}
+.slot-roll-item.pulse{animation:slotPulse .6s ease}
+.slot-roll-item.double-match{animation:slotDouble .8s ease;filter:drop-shadow(0 0 6px #60a5fa)}
+.slot-roll-item.triple-match{animation:slotJackpot 1.2s ease;filter:drop-shadow(0 0 10px #ffd166)}
+@keyframes slotPulse{0%{transform:scale(1)}50%{transform:scale(1.15)}100%{transform:scale(1)}}
+@keyframes slotDouble{0%{transform:scale(1)}25%{transform:scale(1.2)}50%{transform:scale(1.1)}75%{transform:scale(1.25)}100%{transform:scale(1)}}
+@keyframes slotJackpot{0%{transform:scale(1) rotate(0deg)}25%{transform:scale(1.3) rotate(-5deg)}50%{transform:scale(1.1) rotate(5deg)}75%{transform:scale(1.4) rotate(-3deg)}100%{transform:scale(1) rotate(0deg)}}
 
 .hidden{display:none}
 
