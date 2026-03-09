@@ -14,6 +14,11 @@
   const YOYO_HIT_COOLDOWN = 0.18;
   const YOYO_ABILITY_COOLDOWN = 2.0;
   const JOJO_WALK_THE_DOG_HOLD = 5.0;
+  const JOJO_WALK_THE_DOG_COOLDOWN = 10.0;
+  const JOJO_SLINGSHOT_CHARGE_TIME = JOJO_WALK_THE_DOG_HOLD;
+  const JOJO_SLINGSHOT_CHARGE_SPEED_MULT = 1.25;
+  const JOJO_LOCK_COOLDOWN = 20.0;
+  const JOJO_LOCK_ORBIT_SPEED = 10.0;
 
   const HUD_COOLDOWN_TOTAL = YOYO_ABILITY_COOLDOWN;
 
@@ -23,7 +28,8 @@
     // val: remaining cooldown seconds
     recentHits: new Map(),
     yoyoCd: 0,
-    hadYoyoOut: false
+    walkDogCd: 0,
+    lockCd: 0
   };
 
   let hud = {
@@ -31,7 +37,11 @@
     ring: null,
     num: null,
     qRing: null,
-    qNum: null
+    qNum: null,
+    eRing: null,
+    eNum: null,
+    rRing: null,
+    rNum: null
   };
 
   function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
@@ -45,7 +55,8 @@
   function reset(api) {
     s.recentHits.clear();
     s.yoyoCd = 0;
-    s.hadYoyoOut = false;
+    s.walkDogCd = 0;
+    s.lockCd = 0;
     updateHud(api);
   }
 
@@ -71,6 +82,10 @@
     hud.num = document.getElementById('yoyoAbilityNum');
     hud.qRing = document.getElementById('yoyoAbilityHud2');
     hud.qNum = document.getElementById('yoyoAbilityNum2');
+    hud.eRing = document.getElementById('yoyoAbilityHud3');
+    hud.eNum = document.getElementById('yoyoAbilityNum3');
+    hud.rRing = document.getElementById('yoyoAbilityHud4');
+    hud.rNum = document.getElementById('yoyoAbilityNum4');
   }
 
   function ensureHud(api) {
@@ -121,6 +136,42 @@
     qInner.appendChild(qNum);
     qRing.appendChild(qInner);
     root.appendChild(qRing);
+
+    const eRing = document.createElement('div');
+    eRing.id = 'yoyoAbilityHud3';
+    eRing.className = 'chance-ability';
+    eRing.setAttribute('aria-label', 'Slingshot');
+    eRing.setAttribute('data-key', 'E');
+    eRing.style.setProperty('--ring', '#60a5fa');
+
+    const eInner = document.createElement('div');
+    eInner.className = 'chance-ability-inner';
+
+    const eNum = document.createElement('div');
+    eNum.id = 'yoyoAbilityNum3';
+    eNum.className = 'chance-ability-num';
+
+    eInner.appendChild(eNum);
+    eRing.appendChild(eInner);
+    root.appendChild(eRing);
+
+    const rRing = document.createElement('div');
+    rRing.id = 'yoyoAbilityHud4';
+    rRing.className = 'chance-ability';
+    rRing.setAttribute('aria-label', 'Lock');
+    rRing.setAttribute('data-key', 'R');
+    rRing.style.setProperty('--ring', '#ffffff');
+
+    const rInner = document.createElement('div');
+    rInner.className = 'chance-ability-inner';
+
+    const rNum = document.createElement('div');
+    rNum.id = 'yoyoAbilityNum4';
+    rNum.className = 'chance-ability-num';
+
+    rInner.appendChild(rNum);
+    rRing.appendChild(rInner);
+    root.appendChild(rRing);
     document.body.appendChild(root);
 
     ensureHudRefs();
@@ -148,19 +199,42 @@
 
     if (hud.qRing && hud.qNum) {
       const b = getActiveYoyo(api);
-      if (!b || api.state.phase !== 'playing') {
-        hud.qRing.style.display = 'none';
-      } else {
-        hud.qRing.style.display = '';
-        const used = !!b.walkDog;
-        hud.qNum.textContent = used ? '' : '';
-        hud.qRing.style.setProperty('--p', used ? '0' : '1');
-      }
+      const holding = !!b && (b.holdT || 0) > 0;
+      const enabled = !!b && api.state.phase === 'playing' && (holding || (s.walkDogCd || 0) <= 0);
+      hud.qRing.style.display = '';
+      hud.qRing.style.opacity = enabled ? '1' : '0.35';
+      hud.qNum.textContent = '';
+      const p = holding ? 1 : clamp(1 - (s.walkDogCd || 0) / JOJO_WALK_THE_DOG_COOLDOWN, 0, 1);
+      hud.qRing.style.setProperty('--p', enabled ? String(p) : '0');
+    }
+
+    if (hud.eRing && hud.eNum) {
+      const b = getActiveYoyo(api);
+      const enabled = !!b && api.state.phase === 'playing' && !b.slingshotQueued && (
+        (!!b.returning && (b.holdT || 0) <= 0) || ((b.holdT || 0) > 0)
+      );
+      hud.eRing.style.display = '';
+      hud.eRing.style.opacity = enabled ? '1' : '0.35';
+      hud.eNum.textContent = '';
+      hud.eRing.style.setProperty('--p', enabled ? '1' : '0');
+    }
+
+    if (hud.rRing && hud.rNum) {
+      const b = getActiveYoyo(api);
+      const enabled = !!b && api.state.phase === 'playing' && (b.holdT || 0) > 0 && (s.lockCd || 0) <= 0;
+      hud.rRing.style.display = '';
+      hud.rRing.style.opacity = enabled ? '1' : '0.35';
+      const t = clamp(s.lockCd || 0, 0, JOJO_LOCK_COOLDOWN || 0);
+      hud.rNum.textContent = (t > 0) ? Math.ceil(t).toString() : '';
+      const p = (JOJO_LOCK_COOLDOWN <= 0) ? 1 : (1 - (t / JOJO_LOCK_COOLDOWN));
+      hud.rRing.style.setProperty('--p', enabled ? clamp(p, 0, 1).toFixed(3) : '0');
     }
   }
 
   function update(api, dt) {
     if (s.yoyoCd > 0) s.yoyoCd = Math.max(0, s.yoyoCd - dt);
+    if (s.walkDogCd > 0) s.walkDogCd = Math.max(0, s.walkDogCd - dt);
+    if (s.lockCd > 0) s.lockCd = Math.max(0, s.lockCd - dt);
 
     // Decay recent hit cooldowns
     for (const [e, t] of s.recentHits.entries()) {
@@ -183,10 +257,37 @@
         b.vy = 0;
         if ((b.holdT || 0) > 0) {
           // Stay frozen; do not advance other movement state.
-          b.ang = (b.ang || 0) + dt * 14;
+          if (b.slingshotQueued) {
+            b.slingshotCharge = Math.min(JOJO_SLINGSHOT_CHARGE_TIME, (b.slingshotCharge || 0) + dt);
+          }
+
+          if (b.locked) {
+            const px = api.player.x;
+            const py = api.player.y;
+            const dx = px - b.x;
+            const dy = py - b.y;
+            const r = Math.max(12, b.lockRadius || Math.hypot(dx, dy) || 60);
+            b.lockRadius = r;
+            b.lockAng = (b.lockAng != null) ? b.lockAng : Math.atan2(dy, dx);
+            const spin = (b.ang || 0);
+            const orbitSpd = JOJO_LOCK_ORBIT_SPEED + Math.abs(spin) * 0.0;
+            b.lockAng += dt * orbitSpd;
+            const nx = Math.cos(b.lockAng);
+            const ny = Math.sin(b.lockAng);
+            api.player.x = clamp(b.x + nx * r, api.player.r, api.canvas.width - api.player.r);
+            api.player.y = clamp(b.y + ny * r, api.player.r, api.canvas.height - api.player.r);
+          }
+
+          const boostSpin = (b.slingshotBoost ? 2.6 : 1);
+          const speed = Math.hypot(b.vx || 0, b.vy || 0);
+          const spinRate = (6 + speed * 0.05) * boostSpin;
+          b.ang = (b.ang || 0) + dt * spinRate;
           continue;
         }
         // Hold finished; ensure we retract.
+        b.locked = false;
+        b.lockRadius = 0;
+        b.lockAng = 0;
         b.returning = true;
       }
 
@@ -212,20 +313,49 @@
         const dx = api.player.x - b.x;
         const dy = api.player.y - b.y;
         const [nx, ny] = api.norm(dx, dy);
-        const speed = YOYO_PROJECTILE_SPEED * YOYO_RETURN_SPEED_MULT;
+        const boost = b.slingshotBoost ? 2.8 : 1;
+        const speed = YOYO_PROJECTILE_SPEED * YOYO_RETURN_SPEED_MULT * boost;
         b.vx = nx * speed;
         b.vy = ny * speed;
 
         // Remove once it gets back close to player
         const d = Math.hypot(dx, dy);
-        if (d <= api.player.r + (b.r || 8) + 6) {
-          // Mark as expired; main loop will remove on range<=0. But also hard-remove for safety.
-          b.range = 0;
+        const hitDist = api.player.r + (b.r || 8) + 6;
+        if (d <= hitDist) {
+          if (b.slingshotQueued && b.slingshotDir) {
+            const aimDx = (api.state.controlMode === 'mouse' ? api.input.mouse.x : api.aim.x) - api.player.x;
+            const aimDy = (api.state.controlMode === 'mouse' ? api.input.mouse.y : api.aim.y) - api.player.y;
+            const [aimNx, aimNy] = api.norm(aimDx, aimDy);
+            const dir = b.slingshotDir;
+            const outNx = (aimNx || 0) || (dir.x || 0);
+            const outNy = (aimNy || 0) || (dir.y || 0);
+            const muzzle = api.player.r + (b.r || 8) + 8;
+            b.x = api.player.x + outNx * muzzle;
+            b.y = api.player.y + outNy * muzzle;
+            const charge01 = clamp((b.slingshotCharge || 0) / JOJO_SLINGSHOT_CHARGE_TIME, 0, 1);
+            const outSpeed = YOYO_PROJECTILE_SPEED * 2 * (1 + JOJO_SLINGSHOT_CHARGE_SPEED_MULT * charge01);
+            b.vx = outNx * outSpeed;
+            b.vy = outNy * outSpeed;
+            b.returning = false;
+            b.outLeft = YOYO_OUT_DISTANCE;
+            b.holdT = 0;
+            b.walkDog = false;
+            b.slingshotQueued = false;
+            b.slingshotDir = null;
+            b.slingshotBoost = false;
+            b.slingshotCharge = 0;
+          } else {
+            // Mark as expired; main loop will remove on range<=0. But also hard-remove for safety.
+            b.range = 0;
+          }
         }
       }
 
       // Purely visual spin
-      b.ang = (b.ang || 0) + dt * 14;
+      const boostSpin = (b.slingshotBoost ? 2.6 : 1);
+      const speed = Math.hypot(b.vx || 0, b.vy || 0);
+      const spinRate = (6 + speed * 0.05) * boostSpin;
+      b.ang = (b.ang || 0) + dt * spinRate;
     }
 
     updateHud(api);
@@ -267,9 +397,6 @@
       outLeft: YOYO_OUT_DISTANCE,
       ang: 0
     });
-
-    // Cooldown is applied when the yoyo returns (see update()).
-    s.hadYoyoOut = true;
   }
 
   function onKeyDown(api, e) {
@@ -288,12 +415,49 @@
         b.holdT = 0;
         b.returning = true;
       } else {
+        if ((s.walkDogCd || 0) > 0) return true;
         b.walkDog = true;
         b.holdT = JOJO_WALK_THE_DOG_HOLD;
         b.returning = true;
         b.vx = 0;
         b.vy = 0;
+        s.walkDogCd = JOJO_WALK_THE_DOG_COOLDOWN;
       }
+      return true;
+    }
+    if (e.code === 'KeyE') {
+      const b = getActiveYoyo(api);
+      if (!b) return false;
+      if (b.slingshotQueued) return true;
+
+      // If slingshot is pressed during Walk-the-Dog hold, queue it but keep holding.
+      if ((b.holdT || 0) > 0) {
+        const [dnx, dny] = api.norm(b.x - api.player.x, b.y - api.player.y);
+        b.slingshotQueued = true;
+        b.slingshotDir = { x: dnx, y: dny };
+        b.slingshotCharge = 0;
+        return true;
+      }
+
+      if (!b.returning) return true;
+
+      const [dnx, dny] = api.norm(b.x - api.player.x, b.y - api.player.y);
+      b.slingshotQueued = true;
+      b.slingshotDir = { x: dnx, y: dny };
+      b.slingshotCharge = 0;
+      return true;
+    }
+    if (e.code === 'KeyR') {
+      const b = getActiveYoyo(api);
+      if (!b) return false;
+      if (api.state.phase !== 'playing') return true;
+      if ((b.holdT || 0) <= 0) return true;
+      if ((s.lockCd || 0) > 0) return true;
+
+      b.locked = true;
+      b.lockRadius = 0;
+      b.lockAng = null;
+      s.lockCd = JOJO_LOCK_COOLDOWN;
       return true;
     }
     return false;
@@ -338,6 +502,15 @@
       ctx.beginPath();
       ctx.arc(0, 0, br - 4, 0, Math.PI * 2);
       ctx.stroke();
+      if (b.slingshotQueued) {
+        const charge01 = clamp((b.slingshotCharge || 0) / JOJO_SLINGSHOT_CHARGE_TIME, 0, 1);
+        const blueR = br + 4 + 18 * charge01;
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(96,165,250,0.85)';
+        ctx.beginPath();
+        ctx.arc(0, 0, blueR, 0, Math.PI * 2);
+        ctx.stroke();
+      }
       ctx.restore();
     } else if (!b.returning) {
       const t = (b.life || 0) * 6;
@@ -353,13 +526,29 @@
     }
 
     ctx.fillStyle = 'rgba(255,180,60,0.95)';
-    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+    ctx.strokeStyle = (b.slingshotBoost || b.slingshotQueued) ? 'rgba(96,165,250,0.95)' : 'rgba(0,0,0,0.55)';
     ctx.lineWidth = 2;
 
     ctx.beginPath();
     ctx.arc(0, 0, b.r || 10, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
+
+    // White cross detail
+    const cr = Math.max(4, (b.r || 10) * 0.55);
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.lineWidth = Math.max(2, Math.round((b.r || 10) * 0.18));
+    ctx.beginPath();
+    ctx.moveTo(-cr, 0);
+    ctx.lineTo(cr, 0);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, -cr);
+    ctx.lineTo(0, cr);
+    ctx.stroke();
+    ctx.restore();
 
     // Spinning stripes
     const rr = Math.max(2, (b.r || 10) - 5);
@@ -375,9 +564,16 @@
 
     ctx.strokeStyle = 'rgba(255,255,255,0.5)';
     ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(0, 0, Math.max(2, (b.r || 10) - 4), 0, Math.PI * 2);
-    ctx.stroke();
+    const innerR = Math.max(2, (b.r || 10) - 4);
+    const gapCount = 5;
+    const gap = 0.22;
+    const seg = (Math.PI * 2 - gapCount * gap) / gapCount;
+    for (let k = 0; k < gapCount; k++) {
+      const a0 = k * (seg + gap);
+      ctx.beginPath();
+      ctx.arc(0, 0, innerR, a0, a0 + seg);
+      ctx.stroke();
+    }
 
     ctx.restore();
     return true;

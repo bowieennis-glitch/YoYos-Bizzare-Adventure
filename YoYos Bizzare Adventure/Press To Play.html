@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YoYo Shooting Plus</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="hud" class="hud">
+    <div>HP: <span id="hp">100</span></div>
+    <div id="slotRolls" class="slot-rolls hidden">
+      <span class="slot-roll-item" id="hudRollDmg" title="Damage roll">⚔️0</span>
+      <span class="slot-roll-item" id="hudRollFire" title="Fire rate roll">⚡0</span>
+      <span class="slot-roll-item" id="hudRollHp" title="Health roll">❤️0</span>
+    </div>
+    <div>Round: <span id="round">1</span></div>
+    <div>Enemies: <span id="remaining">0</span></div>
+  </div>
+
+  <div id="chanceAbilitiesHud" class="chance-abilities hidden" aria-label="Chance ability charges">
+    <div id="chanceAbilityHud" class="chance-ability" aria-label="Chance ability 1 charges" data-key="SPACE">
+      <div class="chance-ability-inner">
+        <div class="chance-ability-num" id="chanceAbilityNum">0</div>
+      </div>
+    </div>
+    <div id="chanceAbilityHud2" class="chance-ability" aria-label="Chance ability 2 charges" data-key="Q">
+      <div class="chance-ability-inner">
+        <div class="chance-ability-num" id="chanceAbilityNum2">0</div>
+      </div>
+    </div>
+    <div id="chanceAbilityHud3" class="chance-ability" aria-label="Chance ability 3 charges" data-key="E">
+      <div class="chance-ability-inner">
+        <div class="chance-ability-num" id="chanceAbilityNum3">0</div>
+      </div>
+    </div>
+    <div id="chanceAbilityHud4" class="chance-ability" aria-label="Chance ability 4 charges" data-key="R">
+      <div class="chance-ability-inner">
+        <div class="chance-ability-num" id="chanceAbilityNum4">0</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="chanceWeaknessHud" class="chance-weakness hidden" aria-label="Chance weakness stacks">
+    Weakness: <span id="chanceWeaknessNum">0</span> <span id="chanceWeaknessTime"></span>
+  </div>
+
+  <div id="ryanAbilitiesHud" class="chance-abilities hidden" aria-label="Ryan abilities">
+    <div id="ryanDashHud" class="chance-ability" aria-label="Ryan dash cooldown" data-key="SPACE">
+      <div class="chance-ability-inner">
+        <div class="chance-ability-num" id="ryanDashNum"></div>
+      </div>
+    </div>
+    <div id="ryanSwordHud" class="chance-ability" aria-label="Ryan sword throw" data-key="E">
+      <div class="chance-ability-inner">
+        <div class="chance-ability-num" id="ryanSwordNum"></div>
+      </div>
+    </div>
+    <div id="ryanDummyHud" class="chance-ability" aria-label="Ryan dummy bomb cooldown" data-key="Q">
+      <div class="chance-ability-inner">
+        <div class="chance-ability-num" id="ryanDummyNum"></div>
+      </div>
+    </div>
+    <div id="ryanNanamiHud" class="chance-ability" aria-label="Ryan nanami cooldown" data-key="R">
+      <div class="chance-ability-inner">
+        <div class="chance-ability-num" id="ryanNanamiNum"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="titleOverlay" class="overlay">
+    <div class="panel" id="titlePanel">
+      <h1 class="game-title">YoYo Shooting Plus</h1>
+      <div class="menu">
+        <button id="titlePlayBtn" class="btn">Play</button>
+        <button id="titleManualBtn" class="btn">Manual</button>
+        <button id="titleOptionsBtn" class="btn">Options</button>
+        <button id="titleQuitBtn" class="btn">Quit</button>
+      </div>
+    </div>
+    <div class="panel hidden" id="titleManualPanel">
+      <h2>Manual</h2>
+      <div class="menu" style="margin-top:12px;">
+        <button id="manualHowToBtn" class="btn">How to Play</button>
+        <button id="manualCharactersBtn" class="btn">Characters</button>
+        <button id="manualUpgradesBtn" class="btn">Upgrades</button>
+        <button id="manualTipsBtn" class="btn">Tips</button>
+      </div>
+      <div class="actions">
+        <button id="titleManualBackBtn" class="btn">Back</button>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="manualHowToPanel">
+      <h2>How to Play</h2>
+      <div class="stats" style="margin-top:12px;">
+        <div><b>Goal:</b> survive waves and clear rounds.</div>
+        <div><b>Move:</b> WASD</div>
+        <div><b>Aim:</b> Mouse (or Arrow Aim in Options)</div>
+        <div><b>Attack:</b> hold Left Mouse (some characters replace shooting with a melee/ability attack)</div>
+        <div><b>Abilities:</b> Space, Q, E, R (varies by character)</div>
+        <div><b>Pause:</b> Esc</div>
+        <div><b>Toggle controls (in-game):</b> C</div>
+        <div><b>Upgrades:</b> after each round you pick 1 upgrade.</div>
+      </div>
+      <div class="actions">
+        <button id="manualHowToBackBtn" class="btn">Back</button>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="manualCharactersPanel">
+      <h2>Characters</h2>
+      <div class="stats" style="margin-top:12px;">
+        <div style="font-weight:900; letter-spacing:.3px; margin-bottom:6px;">Ryan</div>
+        <div><b>Main Attack:</b> Slashes instead of normal shooting (hits in an arc).</div>
+        <div><b>Space:</b> Dash (5s cooldown). Dashes in your move direction. Can hurt you if you dash through enemies.</div>
+        <div><b>Q:</b> Dummy Bomb (15s cooldown). Drops a bomb at your position that explodes after ~3s (big AoE).</div>
+        <div><b>E:</b> Sword Throw (5s cooldown). Throws a spinning sword that hits enemies on contact and then returns.</div>
+        <div><b>R:</b> Nanami Mode. Starts with a 10s nerf (weaker/slower + take more damage), then a 20s buff (stronger/faster + take less damage), then returns to normal. During buff, each slash also stuns nearby enemies.</div>
+        <div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.10)"></div>
+
+        <div style="font-weight:900; letter-spacing:.3px; margin-bottom:6px;">Jojo</div>
+        <div><b>Space:</b> Throw YoYo (2s cooldown). Only 1 YoYo can be active at a time. It goes out, then returns.</div>
+        <div><b>Q:</b> Walk the Dog (10s cooldown). Freezes the YoYo in place for up to ~5s, then it retracts.</div>
+        <div><b>E:</b> Slingshot. When the YoYo is returning (or while it’s being held), queue a slingshot. The longer you hold during Walk the Dog, the stronger the launch when it returns to you.</div>
+        <div><b>R:</b> Lock (20s cooldown). While Walk the Dog is active, lock yourself orbiting around the YoYo.</div>
+        <div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.10)"></div>
+
+        <div style="font-weight:900; letter-spacing:.3px; margin-bottom:6px;">Chance</div>
+        <div><b>Base:</b> Lower max HP than other characters.</div>
+        <div><b>Space:</b> Coin Flip (2.5s cooldown). <b>Heads</b> gives Weakness stacks for 15s (each stack makes you take more damage and move slower). <b>Tails</b> recharges ability charges.</div>
+        <div><b>E:</b> Throw Ace (uses charges, max 5). Throws a powerful card projectile with explosion.</div>
+        <div><b>Q:</b> Drop Mine (uses charges, max 5). Drops a mine that seeks enemies and explodes on contact.</div>
+        <div><b>R:</b> Stealth (uses charges, max 5). Become invincible for ~10s.</div>
+        <div><b>Slots:</b> before each round you spin for temporary Damage / Fire Rate / HP bonuses.</div>
+      </div>
+      <div class="actions">
+        <button id="manualCharactersBackBtn" class="btn">Back</button>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="manualUpgradesPanel">
+      <h2>Upgrades</h2>
+      <div class="stats" style="margin-top:12px;">
+        <div><b>When:</b> after each round you pick 1 upgrade.</div>
+        <div><b>What they do:</b> upgrades increase your stats like damage, fire rate, move speed, range, projectile speed, crit chance/damage, max HP, regen, life steal, pierce, rebound, explosion radius, and homing.</div>
+        <div><b>Luck:</b> increases the chance of higher rarity upgrades.</div>
+      </div>
+      <div class="actions">
+        <button id="manualUpgradesBackBtn" class="btn">Back</button>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="manualTipsPanel">
+      <h2>Tips</h2>
+      <div class="stats" style="margin-top:12px;">
+        <div><b>Keep moving:</b> enemy contact damage is dangerous if you get surrounded.</div>
+        <div><b>Try different control modes:</b> Mouse Aim is precise; Arrow Aim can be easier on keyboard.</div>
+        <div><b>Upgrade synergies:</b> Piercing + Explosion + Fire Rate can clear crowds fast.</div>
+        <div><b>Character learning:</b> read the bottom-right HUD rings to see cooldowns/charges.</div>
+      </div>
+      <div class="actions">
+        <button id="manualTipsBackBtn" class="btn">Back</button>
+      </div>
+    </div>
+    <div class="panel hidden" id="titleOptionsPanel">
+      <h2>Options</h2>
+      <div class="stats" style="margin-top:12px;">
+        <div>Default Controls:
+          <label><input type="radio" name="titleControlMode" value="mouse" checked> Mouse Aim</label>
+          <label><input type="radio" name="titleControlMode" value="arrow"> Arrow Aim</label>
+        </div>
+        <div>
+          <label><input type="checkbox" id="titleDefaultTestMode"> Test Mode enabled by default</label>
+        </div>
+        <div>
+          <label><input type="checkbox" id="titleDefaultPinStats"> Stats panel pinned by default</label>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="titleOptionsBackBtn" class="btn">Back</button>
+      </div>
+      <p class="hint">These settings are saved automatically.</p>
+    </div>
+  </div>
+
+  <div id="characterOverlay" class="overlay hidden">
+    <div class="panel" id="characterPanel">
+      <h2>Choose a character</h2>
+      <div id="characterOptions" class="menu"></div>
+      <div class="actions">
+        <button id="characterBackBtn" class="btn">Back</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="upgradeOverlay" class="overlay hidden">
+    <div class="panel">
+      <h2>Choose an Upgrade</h2>
+      <div id="upgradeOptions"></div>
+    </div>
+  </div>
+
+  <div id="slotOverlay" class="overlay hidden">
+    <div class="panel">
+      <h2>Chance Slots</h2>
+      <div id="slotReels" class="slot-reels" aria-label="Slot machine reels">
+        <div class="slot-reel">
+          <div class="slot-label">Damage</div>
+          <div class="slot-symbol" id="slotSymbol1">?</div>
+          <div class="slot-value" id="slotValue1"></div>
+        </div>
+        <div class="slot-reel">
+          <div class="slot-label">Fire Rate</div>
+          <div class="slot-symbol" id="slotSymbol2">?</div>
+          <div class="slot-value" id="slotValue2"></div>
+        </div>
+        <div class="slot-reel">
+          <div class="slot-label">Health</div>
+          <div class="slot-symbol" id="slotSymbol3">?</div>
+          <div class="slot-value" id="slotValue3"></div>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="slotSpinBtn" class="btn">Spin</button>
+        <button id="slotRerollBtn" class="btn" disabled>Reroll</button>
+        <button id="slotKeepBtn" class="btn" disabled>Keep Stats</button>
+        <button id="slotStartBtn" class="btn" disabled>Start Round</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="messageOverlay" class="overlay hidden">
+    <div class="panel">
+      <h2 id="messageTitle">Message</h2>
+      <p id="messageSubtitle"></p>
+      <button id="restartBtn" class="btn">Restart</button>
+      <button id="backToMenuBtn" class="btn">Back to Menu</button>
+    </div>
+  </div>
+
+  <script src="upgrades.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

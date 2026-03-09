@@ -25,28 +25,14 @@
   const hudRound = document.getElementById('round');
   const hudRemaining = document.getElementById('remaining');
   const hudEl = document.getElementById('hud');
-  const slotRollsEl = document.getElementById('slotRolls');
-  const hudRollDmg = document.getElementById('hudRollDmg');
-  const hudRollFire = document.getElementById('hudRollFire');
-  const hudRollHp = document.getElementById('hudRollHp');
 
   // Overlay Elements
   const upgradeOptionsEl = document.getElementById('upgradeOptions');
-  const slotOverlay = document.getElementById('slotOverlay');
-  const slotSpinBtn = document.getElementById('slotSpinBtn');
-  const slotRerollBtn = document.getElementById('slotRerollBtn');
-  const slotKeepBtn = document.getElementById('slotKeepBtn');
-  const slotStartBtn = document.getElementById('slotStartBtn');
-  const slotSymbol1 = document.getElementById('slotSymbol1');
-  const slotSymbol2 = document.getElementById('slotSymbol2');
-  const slotSymbol3 = document.getElementById('slotSymbol3');
-  const slotValue1 = document.getElementById('slotValue1');
-  const slotValue2 = document.getElementById('slotValue2');
-  const slotValue3 = document.getElementById('slotValue3');
   const messageOverlay = document.getElementById('messageOverlay');
   const messageTitle = document.getElementById('messageTitle');
   const messageSubtitle = document.getElementById('messageSubtitle');
   const restartBtn = document.getElementById('restartBtn');
+  const backToMenuBtn = document.getElementById('backToMenuBtn');
 
   // Title Screen Elements
   const titleOverlay = document.getElementById('titleOverlay');
@@ -61,6 +47,22 @@
   const titleManualBackBtn = document.getElementById('titleManualBackBtn');
   const titleDefaultTestMode = document.getElementById('titleDefaultTestMode');
   const titleDefaultPinStats = document.getElementById('titleDefaultPinStats');
+
+  // Manual Navigation Elements
+  const manualHowToBtn = document.getElementById('manualHowToBtn');
+  const manualCharactersBtn = document.getElementById('manualCharactersBtn');
+  const manualUpgradesBtn = document.getElementById('manualUpgradesBtn');
+  const manualTipsBtn = document.getElementById('manualTipsBtn');
+
+  const manualHowToPanel = document.getElementById('manualHowToPanel');
+  const manualCharactersPanel = document.getElementById('manualCharactersPanel');
+  const manualUpgradesPanel = document.getElementById('manualUpgradesPanel');
+  const manualTipsPanel = document.getElementById('manualTipsPanel');
+
+  const manualHowToBackBtn = document.getElementById('manualHowToBackBtn');
+  const manualCharactersBackBtn = document.getElementById('manualCharactersBackBtn');
+  const manualUpgradesBackBtn = document.getElementById('manualUpgradesBackBtn');
+  const manualTipsBackBtn = document.getElementById('manualTipsBackBtn');
 
   // Character Select Elements
   const characterOverlay = document.getElementById('characterOverlay');
@@ -113,17 +115,6 @@
   window.registerCharacter = registerCharacter;
 
   let currentCharacter = null;
-
-  const SLOT_SYMBOLS = ['🍒','🍋','🍉','⭐','🔔','🍀','7','💎','🃏','👑'];
-  let slotPendingRound = null;
-  let slotResults = null;
-  let slotSnapshot = null;
-  let slotSpinning = false;
-  let slotSpinIntervals = null;
-  let slotSpinTimeouts = null;
-  let slotRerollCount = 0;
-  let slotKeepCount = 0;
-  let slotKeptResults = null;  // For "keep stats" feature
 
 
   function rechargeAllAbilities() {
@@ -191,7 +182,8 @@
     return Promise.all([
       loadOptionalScript('ryan.js'),
       loadOptionalScript('chance.js'),
-      loadOptionalScript('yoyo.js')
+      loadOptionalScript('yoyo.js'),
+      loadOptionalScript('basic_bill.js')
     ]);
   }
 
@@ -221,194 +213,7 @@
     updatePauseStats();
   }
 
-  function isChance() {
-    return !!(currentCharacter && currentCharacter.id === 'chance');
-  }
-
-  function hideSlots() {
-    if (slotOverlay) slotOverlay.classList.add('hidden');
-    if (slotSpinIntervals) {
-      try {
-        if (slotSpinIntervals.i1) clearInterval(slotSpinIntervals.i1);
-        if (slotSpinIntervals.i2) clearInterval(slotSpinIntervals.i2);
-        if (slotSpinIntervals.i3) clearInterval(slotSpinIntervals.i3);
-      } catch {}
-    }
-    if (slotSpinTimeouts) {
-      try {
-        if (slotSpinTimeouts.t1) clearTimeout(slotSpinTimeouts.t1);
-        if (slotSpinTimeouts.t2) clearTimeout(slotSpinTimeouts.t2);
-        if (slotSpinTimeouts.t3) clearTimeout(slotSpinTimeouts.t3);
-      } catch {}
-    }
-    slotSpinIntervals = null;
-    slotSpinTimeouts = null;
-    slotSpinning = false;
-  }
-
-  function showSlots(round) {
-    console.log('showSlots called for round', round, { currentPhase: state.phase, slotResults });
-    // Grant reroll and keep charges every 3 rounds
-    if (isChance()) {
-      const r = Math.max(1, Math.floor(round || 1));
-      if (r % 3 === 1 && r > 1) {  // After completing rounds 3, 6, 9, etc.
-        slotRerollCount += 1;
-        slotKeepCount += 1;
-        console.log('Granted reroll and keep charges', { slotRerollCount, slotKeepCount });
-      }
-      // Grant initial charges on round 1
-      if (r === 1) {
-        slotRerollCount = 1;
-        slotKeepCount = 1;
-      }
-    }
-    
-    slotPendingRound = Math.max(1, Math.floor(round || 1));
-    slotResults = null;
-
-    if (slotSymbol1) slotSymbol1.textContent = '?';
-    if (slotSymbol2) slotSymbol2.textContent = '?';
-    if (slotSymbol3) slotSymbol3.textContent = '?';
-    if (slotValue1) slotValue1.textContent = '';
-    if (slotValue2) slotValue2.textContent = '';
-    if (slotValue3) slotValue3.textContent = '';
-    if (slotStartBtn) slotStartBtn.disabled = true;
-    if (slotSpinBtn) slotSpinBtn.disabled = false;
-    if (slotRerollBtn) {
-      slotRerollBtn.disabled = slotRerollCount <= 0;
-      slotRerollBtn.style.visibility = slotRerollCount > 0 ? 'visible' : 'hidden';
-    }
-    if (slotKeepBtn) {
-      slotKeepBtn.disabled = slotKeepCount <= 0 || !slotKeptResults;
-      slotKeepBtn.style.visibility = (slotKeepCount > 0 && slotKeptResults) ? 'visible' : 'hidden';
-    }
-    slotSpinning = false;
-
-    state.phase = 'slot';
-    if (slotOverlay) slotOverlay.classList.remove('hidden');
-    updateSlotCounters();
-    console.log('showSlots complete', { phase: state.phase, slotPendingRound });
-  }
-
-  function rollSlotValue() {
-    return 1 + Math.floor(Math.random() * 10);
-  }
-
-  function renderSlotResult(elSymbol, elValue, value) {
-    const idx = clamp((value || 1) - 1, 0, 9);
-    if (elSymbol) elSymbol.textContent = SLOT_SYMBOLS[idx] || String(value);
-    if (elValue) elValue.textContent = String(value);
-  }
-
-  function spinSlotsAnimated() {
-    if (slotSpinning) return;
-    slotSpinning = true;
-    slotResults = null;
-
-    if (slotSpinBtn) slotSpinBtn.disabled = true;
-    if (slotStartBtn) slotStartBtn.disabled = true;
-
-    const tickMs = 60;
-    let cur1 = 1, cur2 = 1, cur3 = 1;
-
-    const rollAndRender1 = () => { cur1 = rollSlotValue(); renderSlotResult(slotSymbol1, slotValue1, cur1); };
-    const rollAndRender2 = () => { cur2 = rollSlotValue(); renderSlotResult(slotSymbol2, slotValue2, cur2); };
-    const rollAndRender3 = () => { cur3 = rollSlotValue(); renderSlotResult(slotSymbol3, slotValue3, cur3); };
-
-    rollAndRender1();
-    rollAndRender2();
-    rollAndRender3();
-
-    slotSpinIntervals = {
-      i1: setInterval(rollAndRender1, tickMs),
-      i2: setInterval(rollAndRender2, tickMs),
-      i3: setInterval(rollAndRender3, tickMs)
-    };
-
-    const stop1At = 850;
-    const stop2At = 1100;
-    const stop3At = 1350;
-    slotSpinTimeouts = {
-      t1: setTimeout(() => { if (slotSpinIntervals && slotSpinIntervals.i1) { clearInterval(slotSpinIntervals.i1); slotSpinIntervals.i1 = null; } }, stop1At),
-      t2: setTimeout(() => { if (slotSpinIntervals && slotSpinIntervals.i2) { clearInterval(slotSpinIntervals.i2); slotSpinIntervals.i2 = null; } }, stop2At),
-      t3: setTimeout(() => {
-        console.log('Spin 3 completed', { cur1, cur2, cur3, slotSpinning });
-        if (slotSpinIntervals && slotSpinIntervals.i3) { clearInterval(slotSpinIntervals.i3); slotSpinIntervals.i3 = null; }
-        slotResults = { dmg: cur1, fire: cur2, hp: cur3 };
-        console.log('slotResults set:', slotResults);
-        slotSpinning = false;
-        if (slotSpinBtn) slotSpinBtn.disabled = false;
-        if (slotStartBtn) {
-          slotStartBtn.disabled = false;
-          console.log('Start button enabled');
-        }
-        if (slotRerollBtn) {
-          slotRerollBtn.disabled = slotRerollCount <= 0;
-          slotRerollBtn.style.visibility = slotRerollCount > 0 ? 'visible' : 'hidden';
-        }
-        if (slotKeepBtn) {
-          slotKeepBtn.disabled = slotKeepCount <= 0 || !slotKeptResults;
-          slotKeepBtn.style.visibility = (slotKeepCount > 0 && slotKeptResults) ? 'visible' : 'hidden';
-        }
-      }, stop3At)
-    };
-  }
-
-  function getSlotMatchMultipliers(results) {
-    const r1 = clamp(Math.floor(results?.dmg || 1), 1, 10);
-    const r2 = clamp(Math.floor(results?.fire || 1), 1, 10);
-    const r3 = clamp(Math.floor(results?.hp || 1), 1, 10);
-    if (r1 === r2 && r2 === r3) return { dmg: 3, fire: 3, hp: 3 };
-    if (r1 === r2) return { dmg: 2, fire: 2, hp: 1 };
-    if (r1 === r3) return { dmg: 2, fire: 1, hp: 2 };
-    if (r2 === r3) return { dmg: 1, fire: 2, hp: 2 };
-    return { dmg: 1, fire: 1, hp: 1 };
-  }
-
-  function restoreSlotBonusesIfAny() {
-    if (!slotSnapshot) return;
-    player.damage = slotSnapshot.damage;
-    player.shotInterval = slotSnapshot.shotInterval;
-    player.maxHp = slotSnapshot.maxHp;
-    player.hp = Math.min(player.maxHp, player.hp);
-    slotSnapshot = null;
-  }
-
-  function applySlotBonuses() {
-    if (!slotResults) return;
-    restoreSlotBonusesIfAny();
-
-    const mm = getSlotMatchMultipliers(slotResults);
-
-    const dmgSteps = clamp(Math.floor(slotResults.dmg || 1) * (mm.dmg || 1), 1, 30);
-    const fireSteps = clamp(Math.floor(slotResults.fire || 1) * (mm.fire || 1), 1, 30);
-    const hpSteps = clamp(Math.floor(slotResults.hp || 1) * (mm.hp || 1), 1, 30);
-
-    const dmgMult = 1 + 0.10 * dmgSteps;
-    const fireMult = 1 + 0.10 * fireSteps;
-    const hpMult = 1 + 0.10 * hpSteps;
-
-    slotSnapshot = {
-      damage: player.damage,
-      shotInterval: player.shotInterval,
-      maxHp: player.maxHp
-    };
-
-    player.damage = player.damage * dmgMult;
-    player.shotInterval = Math.max(0.05, player.shotInterval / fireMult);
-    const oldMax = player.maxHp;
-    const newMax = Math.max(1, Math.ceil(oldMax * hpMult));
-    if (newMax !== oldMax) {
-      player.maxHp = newMax;
-      player.hp = Math.min(player.maxHp, player.hp + (newMax - oldMax));
-    }
-    
-    // Store results for potential "keep" next round
-    slotKeptResults = { ...slotResults };
-  }
-
   function beginRound(round) {
-    restoreSlotBonusesIfAny();
     const r = Math.max(1, Math.floor(round || 1));
     
     // Prevent starting new round if current round not complete (unless in test mode)
@@ -416,9 +221,9 @@
       return;
     }
     
-    if (isChance()) {
-      showSlots(r);
-      return;
+    if (currentCharacter && typeof currentCharacter.onBeginRound === 'function') {
+      const handled = !!currentCharacter.onBeginRound(getGameApi(), r);
+      if (handled) return;
     }
     spawnRound(r);
     state.phase = 'playing';
@@ -483,10 +288,45 @@
     if (titlePanel) titlePanel.classList.add('hidden');
     if (titleOptionsPanel) titleOptionsPanel.classList.add('hidden');
     if (titleManualPanel) titleManualPanel.classList.remove('hidden');
+    if (manualHowToPanel) manualHowToPanel.classList.add('hidden');
+    if (manualCharactersPanel) manualCharactersPanel.classList.add('hidden');
+    if (manualUpgradesPanel) manualUpgradesPanel.classList.add('hidden');
+    if (manualTipsPanel) manualTipsPanel.classList.add('hidden');
   }
   function closeTitleManual() {
     if (titlePanel) titlePanel.classList.remove('hidden');
     if (titleManualPanel) titleManualPanel.classList.add('hidden');
+    if (manualHowToPanel) manualHowToPanel.classList.add('hidden');
+    if (manualCharactersPanel) manualCharactersPanel.classList.add('hidden');
+    if (manualUpgradesPanel) manualUpgradesPanel.classList.add('hidden');
+    if (manualTipsPanel) manualTipsPanel.classList.add('hidden');
+  }
+
+  function openManualSection(which) {
+    if (!titleOverlay) return;
+    if (titlePanel) titlePanel.classList.add('hidden');
+    if (titleOptionsPanel) titleOptionsPanel.classList.add('hidden');
+    if (titleManualPanel) titleManualPanel.classList.add('hidden');
+    if (manualHowToPanel) manualHowToPanel.classList.add('hidden');
+    if (manualCharactersPanel) manualCharactersPanel.classList.add('hidden');
+    if (manualUpgradesPanel) manualUpgradesPanel.classList.add('hidden');
+    if (manualTipsPanel) manualTipsPanel.classList.add('hidden');
+
+    if (which === 'howto' && manualHowToPanel) manualHowToPanel.classList.remove('hidden');
+    if (which === 'characters' && manualCharactersPanel) manualCharactersPanel.classList.remove('hidden');
+    if (which === 'upgrades' && manualUpgradesPanel) manualUpgradesPanel.classList.remove('hidden');
+    if (which === 'tips' && manualTipsPanel) manualTipsPanel.classList.remove('hidden');
+  }
+
+  function backToManualMenu() {
+    if (!titleOverlay) return;
+    if (titlePanel) titlePanel.classList.add('hidden');
+    if (titleOptionsPanel) titleOptionsPanel.classList.add('hidden');
+    if (titleManualPanel) titleManualPanel.classList.remove('hidden');
+    if (manualHowToPanel) manualHowToPanel.classList.add('hidden');
+    if (manualCharactersPanel) manualCharactersPanel.classList.add('hidden');
+    if (manualUpgradesPanel) manualUpgradesPanel.classList.add('hidden');
+    if (manualTipsPanel) manualTipsPanel.classList.add('hidden');
   }
   function startFromTitle() {
     showCharacterSelect();
@@ -695,88 +535,23 @@
   window.addEventListener('touchcancel', () => input.mouse.down = false, { passive: true });
 
   restartBtn.addEventListener('click', () => restartGame());
-
-  if (slotSpinBtn) slotSpinBtn.addEventListener('click', () => {
-    if (state.phase !== 'slot') return;
-    spinSlotsAnimated();
-    updateHUD();
-  });
-
-  if (slotRerollBtn) slotRerollBtn.addEventListener('click', () => {
-    if (state.phase !== 'slot') return;
-    if (slotRerollCount <= 0) return;
-    if (slotSpinning) return;
-    slotRerollCount--;
-    slotResults = null;
-    if (slotStartBtn) slotStartBtn.disabled = true;
-    if (slotRerollBtn) {
-      slotRerollBtn.disabled = slotRerollCount <= 0;
-      slotRerollBtn.style.visibility = slotRerollCount > 0 ? 'visible' : 'hidden';
-    }
-    updateSlotCounters();
-    spinSlotsAnimated();
-    updateHUD();
-  });
-
-  if (slotKeepBtn) slotKeepBtn.addEventListener('click', () => {
-    if (state.phase !== 'slot') return;
-    if (slotKeepCount <= 0 || !slotKeptResults) return;
-    slotKeepCount--;
-    slotResults = { ...slotKeptResults };
-    // Display the kept results
-    renderSlotResult(slotSymbol1, slotValue1, slotResults.dmg);
-    renderSlotResult(slotSymbol2, slotValue2, slotResults.fire);
-    renderSlotResult(slotSymbol3, slotValue3, slotResults.hp);
-    if (slotStartBtn) slotStartBtn.disabled = false;
-    if (slotSpinBtn) slotSpinBtn.disabled = false;
-    if (slotKeepBtn) {
-      slotKeepBtn.disabled = slotKeepCount <= 0 || !slotKeptResults;
-      slotKeepBtn.style.visibility = (slotKeepCount > 0 && slotKeptResults) ? 'visible' : 'hidden';
-    }
-    updateSlotCounters();
-    updateHUD();
-  });
-
-  function updateSlotCounters() {
-    // Create or update counter display
-    let counterEl = document.getElementById('slotCounterDisplay');
-    if (!counterEl) {
-      counterEl = document.createElement('div');
-      counterEl.id = 'slotCounterDisplay';
-      counterEl.className = 'slot-counters';
-      const panel = document.querySelector('#slotOverlay .panel');
-      if (panel) {
-        const actions = panel.querySelector('.actions');
-        if (actions) panel.insertBefore(counterEl, actions);
-      }
-    }
-    if (counterEl) {
-      counterEl.innerHTML = `
-        <span class="slot-counter ${slotRerollCount > 0 ? 'has-charge' : ''}">🔄 ${slotRerollCount}</span>
-        <span class="slot-counter ${slotKeepCount > 0 ? 'has-charge' : ''}">💾 ${slotKeepCount}</span>
-      `;
-    }
-  }
-
-  if (slotStartBtn) slotStartBtn.addEventListener('click', () => {
-    console.log('Start Round clicked', { phase: state.phase, slotResults, slotPendingRound });
-    if (state.phase !== 'slot') { console.log('Blocked: not in slot phase'); return; }
-    if (!slotResults) { console.log('Blocked: no slot results'); return; }
-    console.log('Starting round...');
-    applySlotBonuses();
-    hideSlots();
-    const r = Math.max(1, Math.floor(slotPendingRound || state.round || 1));
-    console.log('Spawning round', r);
-    spawnRound(r);
-    state.phase = 'playing';
-    updateHUD();
-  });
+  if (backToMenuBtn) backToMenuBtn.addEventListener('click', () => backToMenu());
 
   if (titlePlayBtn) titlePlayBtn.addEventListener('click', () => startFromTitle());
   if (titleManualBtn) titleManualBtn.addEventListener('click', () => openTitleManual());
   if (titleOptionsBtn) titleOptionsBtn.addEventListener('click', () => openTitleOptions());
   if (titleOptionsBackBtn) titleOptionsBackBtn.addEventListener('click', () => closeTitleOptions());
   if (titleManualBackBtn) titleManualBackBtn.addEventListener('click', () => closeTitleManual());
+
+  if (manualHowToBtn) manualHowToBtn.addEventListener('click', () => openManualSection('howto'));
+  if (manualCharactersBtn) manualCharactersBtn.addEventListener('click', () => openManualSection('characters'));
+  if (manualUpgradesBtn) manualUpgradesBtn.addEventListener('click', () => openManualSection('upgrades'));
+  if (manualTipsBtn) manualTipsBtn.addEventListener('click', () => openManualSection('tips'));
+
+  if (manualHowToBackBtn) manualHowToBackBtn.addEventListener('click', () => backToManualMenu());
+  if (manualCharactersBackBtn) manualCharactersBackBtn.addEventListener('click', () => backToManualMenu());
+  if (manualUpgradesBackBtn) manualUpgradesBackBtn.addEventListener('click', () => backToManualMenu());
+  if (manualTipsBackBtn) manualTipsBackBtn.addEventListener('click', () => backToManualMenu());
   if (characterBackBtn) characterBackBtn.addEventListener('click', () => { hideCharacterSelect(); showTitle(); });
   if (titleQuitBtn) titleQuitBtn.addEventListener('click', () => {
     try {
@@ -803,6 +578,7 @@
   });
 
   showTitle();
+  resetTitleDemo();
 
   endlessBtn = document.createElement('button');
   endlessBtn.id = 'endlessBtn';
@@ -1101,12 +877,80 @@
     aim.dirX = 1; aim.dirY = 0; aim.x = player.x + aim.dirX * aim.radius; aim.y = player.y + aim.dirY * aim.radius;
     state.phase = (state.phase === 'title') ? 'title' : 'playing';
     hideUpgrade();
-    hideSlots();
     hideMessage();
+    if (currentCharacter && typeof currentCharacter.onRoundCleared === 'function') currentCharacter.onRoundCleared(getGameApi());
     beginRound(state.round);
     updateHUD();
     updateTestUI();
     if (pinnedStatsEl) pinnedStatsEl.style.display = 'none';
+  }
+
+  function resetTitleDemo() {
+    // Keep a lightweight animated background while on the title screen.
+    bullets.length = 0;
+    hitTexts.length = 0;
+    vfx.length = 0;
+    bloodStains.length = 0;
+
+    // Hide player by not drawing it; still keep sane coords for enemy movement.
+    player.x = canvas.width / 2;
+    player.y = canvas.height / 2;
+
+    enemies.length = 0;
+    const count = 10;
+    for (let i = 0; i < count; i++) {
+      const size = rand(18, 34);
+      enemies.push({
+        x: rand(0, canvas.width - size),
+        y: rand(0, canvas.height - size),
+        w: size,
+        h: size,
+        hp: 1,
+        maxHp: 1,
+        speed: rand(20, 65),
+        color: 'rgba(255,75,75,0.9)',
+        contactDps: 0,
+        isBoss: false,
+        demoDirX: rand(-1, 1),
+        demoDirY: rand(-1, 1),
+        demoTurnT: rand(0.4, 1.4)
+      });
+    }
+  }
+
+  function updateTitleDemo(dt) {
+    // Wander around and bounce off edges.
+    for (const e of enemies) {
+      if (!e) continue;
+      e.demoTurnT = (e.demoTurnT || 0) - dt;
+      if ((e.demoTurnT || 0) <= 0) {
+        e.demoTurnT = rand(0.4, 1.4);
+        const ang = rand(0, Math.PI * 2);
+        e.demoDirX = Math.cos(ang);
+        e.demoDirY = Math.sin(ang);
+      }
+
+      const dx = (e.demoDirX || 0);
+      const dy = (e.demoDirY || 0);
+      const d = Math.hypot(dx, dy) || 1;
+      const nx = dx / d;
+      const ny = dy / d;
+      e.x += nx * (e.speed || 40) * dt;
+      e.y += ny * (e.speed || 40) * dt;
+
+      if (e.x <= 0) { e.x = 0; e.demoDirX = Math.abs(e.demoDirX || 0); }
+      if (e.y <= 0) { e.y = 0; e.demoDirY = Math.abs(e.demoDirY || 0); }
+      if (e.x + e.w >= canvas.width) { e.x = canvas.width - e.w; e.demoDirX = -Math.abs(e.demoDirX || 0); }
+      if (e.y + e.h >= canvas.height) { e.y = canvas.height - e.h; e.demoDirY = -Math.abs(e.demoDirY || 0); }
+    }
+  }
+
+  function backToMenu() {
+    hideUpgrade();
+    hideMessage();
+    if (pauseOverlay) pauseOverlay.classList.add('hidden');
+    showTitle();
+    resetTitleDemo();
   }
 
   function getGameApi() {
@@ -1129,7 +973,9 @@
       damagePlayer,
       dealExplosionDamage,
       spawnExplosionVfx,
-      fireBullet
+      fireBullet,
+      spawnRound,
+      updateHUD
     };
   }
 
@@ -1141,23 +987,7 @@
     hudHp.textContent = Math.max(0, Math.ceil(player.hp)).toString();
     hudRound.textContent = state.round.toString();
     hudRemaining.textContent = enemies.length.toString();
-    
-    // Show slot rolls for Chance
-    if (isChance() && slotRollsEl) {
-      slotRollsEl.classList.remove('hidden');
-      if (slotResults) {
-        if (hudRollDmg) hudRollDmg.textContent = '⚔️' + (slotResults.dmg || 0);
-        if (hudRollFire) hudRollFire.textContent = '⚡' + (slotResults.fire || 0);
-        if (hudRollHp) hudRollHp.textContent = '❤️' + (slotResults.hp || 0);
-      } else {
-        if (hudRollDmg) hudRollDmg.textContent = '⚔️?';
-        if (hudRollFire) hudRollFire.textContent = '⚡?';
-        if (hudRollHp) hudRollHp.textContent = '❤️?';
-      }
-    } else if (slotRollsEl) {
-      slotRollsEl.classList.add('hidden');
-    }
-    
+
     updatePinnedStats();
     if (currentCharacter && typeof currentCharacter.updateHud === 'function') currentCharacter.updateHud(getGameApi());
   }
@@ -1468,7 +1298,8 @@
       const pos = edgeSpawnPosition(size);
       const hpMult = s.hpMult;
       const speedMult = s.speedMult;
-      const hp = Math.max(1, Math.round(6 * hpMult));
+      const bossBaseHp = 120;
+      const hp = Math.max(1, Math.round(bossBaseHp * hpMult));
       state.roundTotal = 1;
       enemies.push({
         x: pos.x, y: pos.y,
@@ -1478,9 +1309,37 @@
         speed: Math.min(player.speed, 80 * speedMult),
         color: '#ff2d2d',
         contactDps: 35 * hpMult,
-        isBoss: true
+        isBoss: true,
+        shootCd: 1.6
       });
     }
+  }
+
+  function fireBossProjectile(boss) {
+    if (!boss) return;
+    const cx = boss.x + boss.w / 2;
+    const cy = boss.y + boss.h / 2;
+    const dx = player.x - cx;
+    const dy = player.y - cy;
+    const d = Math.hypot(dx, dy) || 1;
+    const nx = dx / d;
+    const ny = dy / d;
+    const speed = 420;
+    const dmg = 14;
+    bullets.push({
+      fromEnemy: true,
+      x: cx,
+      y: cy,
+      r: 6,
+      vx: nx * speed,
+      vy: ny * speed,
+      damage: dmg,
+      range: Math.max(canvas.width, canvas.height) * 1.2,
+      rebound: 0,
+      pierce: 0,
+      explosionRadius: 0,
+      homingDeg: 0
+    });
   }
 
   function progressRoundSpawns() {
@@ -1530,7 +1389,11 @@
   }
 
   function update(dt) {
-    if (state.phase === 'title') return;
+    if (state.phase === 'title') {
+      updateVfx(dt);
+      updateTitleDemo(dt);
+      return;
+    }
     if (state.phase === 'character') return;
     if (state.phase === 'message') return;
     if (state.phase === 'paused') { updatePauseStats(); return; }
@@ -1614,8 +1477,34 @@
       else fireBullet();
     }
 
+    // Round 20 boss projectile attack
+    if (state.phase === 'playing' && state.round === 20) {
+      const boss = enemies.find(e => e && e.isBoss);
+      if (boss) {
+        boss.shootCd = (boss.shootCd || 0) - dt;
+        if ((boss.shootCd || 0) <= 0) {
+          boss.shootCd = 1.25;
+          fireBossProjectile(boss);
+        }
+      }
+    }
+
     for (let i = bullets.length - 1; i >= 0; i--) {
       const b = bullets[i];
+      if (b && b.fromEnemy) {
+        const mx = b.vx * dt, my = b.vy * dt;
+        b.x += mx; b.y += my; b.range -= Math.hypot(mx, my);
+        if (b.x - b.r < 0 || b.x + b.r > canvas.width || b.y - b.r < 0 || b.y + b.r > canvas.height) {
+          bullets.splice(i, 1);
+          continue;
+        }
+        if (b.range <= 0) { bullets.splice(i, 1); continue; }
+        if (player.alive && circleRectIntersect(b.x, b.y, b.r, player.x - player.r, player.y - player.r, player.r * 2, player.r * 2)) {
+          damagePlayer(b.damage || 0, player.x, player.y - player.r - 8);
+          bullets.splice(i, 1);
+        }
+        continue;
+      }
       if (b.homingDeg && b.homingDeg > 0 && enemies.length > 0) {
         let tx = null, ty = null, bestD2 = Infinity;
         for (const e of enemies) {
@@ -1807,7 +1696,7 @@
     progressRoundSpawns();
 
     if (state.phase === 'playing' && enemies.length === 0) {
-      restoreSlotBonusesIfAny();
+      if (currentCharacter && typeof currentCharacter.onRoundCleared === 'function') currentCharacter.onRoundCleared(getGameApi());
       if (state.mode === 'normal' && state.round === 20) showEndlessPrompt();
       else showUpgrade();
     }
@@ -1825,17 +1714,11 @@
   function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Screen shake for Chance based on fire rate - more impactful shake
     let shakeX = 0, shakeY = 0;
-    if (isChance() && state.phase === 'playing') {
-      const fireRate = 1 / Math.max(0.001, player.shotInterval);
-      const baseFireRate = 1 / 0.16;
-      const fireRateMult = fireRate / baseFireRate;
-      // Stronger, more dynamic shake that scales with fire rate
-      const shakeIntensity = Math.min(4, Math.max(0.5, (fireRateMult - 1) * 0.6));
-      const time = performance.now() / 25;
-      shakeX = Math.sin(time * 4) * shakeIntensity * 0.7 + (Math.random() - 0.5) * shakeIntensity * 0.8;
-      shakeY = Math.cos(time * 3.2) * shakeIntensity * 0.7 + (Math.random() - 0.5) * shakeIntensity * 0.8;
+    if (currentCharacter && typeof currentCharacter.getScreenShake === 'function') {
+      const s = currentCharacter.getScreenShake(getGameApi());
+      if (s && typeof s.x === 'number' && isFinite(s.x)) shakeX = s.x;
+      if (s && typeof s.y === 'number' && isFinite(s.y)) shakeY = s.y;
     }
     
     ctx.save();
@@ -1858,10 +1741,19 @@
       ctx.restore();
     }
 
-    drawPlayer();
+    if (state.phase !== 'title') drawPlayer();
 
     ctx.fillStyle = '#f5f7ff';
     for (const b of bullets) {
+      if (b && b.fromEnemy) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(255,120,120,0.98)';
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r || 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        continue;
+      }
       if (currentCharacter && typeof currentCharacter.drawBullet === 'function') {
         const handled = !!currentCharacter.drawBullet(getGameApi(), b, ctx);
         if (handled) continue;
@@ -1909,7 +1801,7 @@
     }
     ctx.restore();
 
-    drawGunBarrel();
+    if (state.phase !== 'title') drawGunBarrel();
     ctx.restore(); // Close screen shake transform
   }
 

@@ -9,6 +9,7 @@ html,body{margin:0;height:100%;font-family:system-ui,-apple-system,Segoe UI,Robo
 .btn,.options button{appearance:none;border:1px solid rgba(255,255,255,.12);background:#1a2030;color:var(--text);padding:12px 14px;border-radius:10px;cursor:pointer;font-weight:700;letter-spacing:.4px;transition:transform .06s ease,border-color .2s ease,background .2s ease}
 .btn:hover,.options button:hover{transform:translateY(-1px);border-color:var(--accent);background:#20283a}
 .hint{opacity:.7;margin-top:12px;font-size:12px}
+#titleOverlay .panel{max-height:86vh;overflow:auto}
 #upgradeOptions button{text-align:left;line-height:1.15}
 .up-rarity{font-size:11px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;margin-bottom:6px;opacity:.95}
 .up-title{font-size:14px;font-weight:800;letter-spacing:.3px}

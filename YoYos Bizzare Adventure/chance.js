@@ -33,6 +33,35 @@
   const CHANCE_STEALTH_SEC = 10;
   const CHANCE_COIN_VFX_LIFE = 0.55;
 
+  const SLOT_SYMBOLS = ['🍒','🍋','🍉','⭐','🔔','🍀','7','💎','🃏','👑'];
+
+  let slotOverlay = null;
+  let slotSpinBtn = null;
+  let slotRerollBtn = null;
+  let slotKeepBtn = null;
+  let slotStartBtn = null;
+  let slotSymbol1 = null;
+  let slotSymbol2 = null;
+  let slotSymbol3 = null;
+  let slotValue1 = null;
+  let slotValue2 = null;
+  let slotValue3 = null;
+  let slotRollsEl = null;
+  let hudRollDmg = null;
+  let hudRollFire = null;
+  let hudRollHp = null;
+
+  let slotPendingRound = null;
+  let slotResults = null;
+  let slotSnapshot = null;
+  let slotSpinning = false;
+  let slotSpinIntervals = null;
+  let slotSpinTimeouts = null;
+  let slotRerollCount = 0;
+  let slotKeepCount = 0;
+  let slotKeptResults = null;
+  let slotUiWired = false;
+
   let hud = {
     abilitiesRoot: null,
     coinRing: null,
@@ -66,6 +95,256 @@
 
   function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
 
+  function ensureSlotRefs() {
+    slotOverlay = document.getElementById('slotOverlay');
+    slotSpinBtn = document.getElementById('slotSpinBtn');
+    slotRerollBtn = document.getElementById('slotRerollBtn');
+    slotKeepBtn = document.getElementById('slotKeepBtn');
+    slotStartBtn = document.getElementById('slotStartBtn');
+    slotSymbol1 = document.getElementById('slotSymbol1');
+    slotSymbol2 = document.getElementById('slotSymbol2');
+    slotSymbol3 = document.getElementById('slotSymbol3');
+    slotValue1 = document.getElementById('slotValue1');
+    slotValue2 = document.getElementById('slotValue2');
+    slotValue3 = document.getElementById('slotValue3');
+
+    slotRollsEl = document.getElementById('slotRolls');
+    hudRollDmg = document.getElementById('hudRollDmg');
+    hudRollFire = document.getElementById('hudRollFire');
+    hudRollHp = document.getElementById('hudRollHp');
+  }
+
+  function hideSlots() {
+    ensureSlotRefs();
+    if (slotOverlay) slotOverlay.classList.add('hidden');
+    if (slotSpinIntervals) {
+      try {
+        if (slotSpinIntervals.i1) clearInterval(slotSpinIntervals.i1);
+        if (slotSpinIntervals.i2) clearInterval(slotSpinIntervals.i2);
+        if (slotSpinIntervals.i3) clearInterval(slotSpinIntervals.i3);
+      } catch {}
+    }
+    if (slotSpinTimeouts) {
+      try {
+        if (slotSpinTimeouts.t1) clearTimeout(slotSpinTimeouts.t1);
+        if (slotSpinTimeouts.t2) clearTimeout(slotSpinTimeouts.t2);
+        if (slotSpinTimeouts.t3) clearTimeout(slotSpinTimeouts.t3);
+      } catch {}
+    }
+    slotSpinIntervals = null;
+    slotSpinTimeouts = null;
+    slotSpinning = false;
+  }
+
+  function restoreSlotBonusesIfAny(api) {
+    if (!slotSnapshot) return;
+    api.player.damage = slotSnapshot.damage;
+    api.player.shotInterval = slotSnapshot.shotInterval;
+    api.player.maxHp = slotSnapshot.maxHp;
+    api.player.hp = Math.min(api.player.maxHp, api.player.hp);
+    slotSnapshot = null;
+  }
+
+  function getSlotMatchMultipliers(results) {
+    const r1 = clamp(Math.floor(results?.dmg || 1), 1, 10);
+    const r2 = clamp(Math.floor(results?.fire || 1), 1, 10);
+    const r3 = clamp(Math.floor(results?.hp || 1), 1, 10);
+    if (r1 === r2 && r2 === r3) return { dmg: 3, fire: 3, hp: 3 };
+    if (r1 === r2) return { dmg: 2, fire: 2, hp: 1 };
+    if (r1 === r3) return { dmg: 2, fire: 1, hp: 2 };
+    if (r2 === r3) return { dmg: 1, fire: 2, hp: 2 };
+    return { dmg: 1, fire: 1, hp: 1 };
+  }
+
+  function applySlotBonuses(api) {
+    if (!slotResults) return;
+    restoreSlotBonusesIfAny(api);
+
+    const mm = getSlotMatchMultipliers(slotResults);
+
+    const dmgSteps = clamp(Math.floor(slotResults.dmg || 1) * (mm.dmg || 1), 1, 30);
+    const fireSteps = clamp(Math.floor(slotResults.fire || 1) * (mm.fire || 1), 1, 30);
+    const hpSteps = clamp(Math.floor(slotResults.hp || 1) * (mm.hp || 1), 1, 30);
+
+    const dmgMult = 1 + 0.10 * dmgSteps;
+    const fireMult = 1 + 0.10 * fireSteps;
+    const hpMult = 1 + 0.10 * hpSteps;
+
+    slotSnapshot = {
+      damage: api.player.damage,
+      shotInterval: api.player.shotInterval,
+      maxHp: api.player.maxHp
+    };
+
+    api.player.damage = api.player.damage * dmgMult;
+    api.player.shotInterval = Math.max(0.05, api.player.shotInterval / fireMult);
+    const oldMax = api.player.maxHp;
+    const newMax = Math.max(1, Math.ceil(oldMax * hpMult));
+    if (newMax !== oldMax) {
+      api.player.maxHp = newMax;
+      api.player.hp = Math.min(api.player.maxHp, api.player.hp + (newMax - oldMax));
+    }
+
+    slotKeptResults = { ...slotResults };
+  }
+
+  function updateSlotButtons() {
+    ensureSlotRefs();
+    if (slotSpinBtn) slotSpinBtn.disabled = !!slotSpinning;
+    if (slotStartBtn) slotStartBtn.disabled = !!slotSpinning || !slotResults;
+    if (slotRerollBtn) {
+      slotRerollBtn.disabled = !!slotSpinning || slotRerollCount <= 0;
+      slotRerollBtn.style.visibility = slotRerollCount > 0 ? 'visible' : 'hidden';
+    }
+    if (slotKeepBtn) {
+      slotKeepBtn.disabled = !!slotSpinning || slotKeepCount <= 0 || !slotKeptResults;
+      slotKeepBtn.style.visibility = (slotKeepCount > 0 && slotKeptResults) ? 'visible' : 'hidden';
+    }
+  }
+
+  function updateSlotCounters() {
+    ensureSlotRefs();
+    let counterEl = document.getElementById('slotCounterDisplay');
+    if (!counterEl) {
+      counterEl = document.createElement('div');
+      counterEl.id = 'slotCounterDisplay';
+      counterEl.className = 'slot-counters';
+      const panel = document.querySelector('#slotOverlay .panel');
+      if (panel) {
+        const actions = panel.querySelector('.actions');
+        if (actions) panel.insertBefore(counterEl, actions);
+      }
+    }
+    if (counterEl) {
+      counterEl.innerHTML = `
+        <span class="slot-counter ${slotRerollCount > 0 ? 'has-charge' : ''}">🔄 ${slotRerollCount}</span>
+        <span class="slot-counter ${slotKeepCount > 0 ? 'has-charge' : ''}">💾 ${slotKeepCount}</span>
+      `;
+    }
+  }
+
+  function rollSlotValue() {
+    return 1 + Math.floor(Math.random() * 10);
+  }
+
+  function renderSlotResult(elSymbol, elValue, value) {
+    const idx = clamp((value || 1) - 1, 0, 9);
+    if (elSymbol) elSymbol.textContent = SLOT_SYMBOLS[idx] || String(value);
+    if (elValue) elValue.textContent = String(value);
+  }
+
+  function spinSlotsAnimated() {
+    ensureSlotRefs();
+    if (slotSpinning) return;
+    slotSpinning = true;
+    slotResults = null;
+    updateSlotButtons();
+
+    const tickMs = 60;
+    let cur1 = 1, cur2 = 1, cur3 = 1;
+
+    const rollAndRender1 = () => { cur1 = rollSlotValue(); renderSlotResult(slotSymbol1, slotValue1, cur1); };
+    const rollAndRender2 = () => { cur2 = rollSlotValue(); renderSlotResult(slotSymbol2, slotValue2, cur2); };
+    const rollAndRender3 = () => { cur3 = rollSlotValue(); renderSlotResult(slotSymbol3, slotValue3, cur3); };
+
+    rollAndRender1();
+    rollAndRender2();
+    rollAndRender3();
+
+    slotSpinIntervals = {
+      i1: setInterval(rollAndRender1, tickMs),
+      i2: setInterval(rollAndRender2, tickMs),
+      i3: setInterval(rollAndRender3, tickMs)
+    };
+
+    const stop1At = 850;
+    const stop2At = 1100;
+    const stop3At = 1350;
+    slotSpinTimeouts = {
+      t1: setTimeout(() => { if (slotSpinIntervals && slotSpinIntervals.i1) { clearInterval(slotSpinIntervals.i1); slotSpinIntervals.i1 = null; } }, stop1At),
+      t2: setTimeout(() => { if (slotSpinIntervals && slotSpinIntervals.i2) { clearInterval(slotSpinIntervals.i2); slotSpinIntervals.i2 = null; } }, stop2At),
+      t3: setTimeout(() => {
+        if (slotSpinIntervals && slotSpinIntervals.i3) { clearInterval(slotSpinIntervals.i3); slotSpinIntervals.i3 = null; }
+        slotResults = { dmg: cur1, fire: cur2, hp: cur3 };
+        slotSpinning = false;
+        updateSlotButtons();
+      }, stop3At)
+    };
+  }
+
+  function showSlots(round) {
+    ensureSlotRefs();
+
+    const r = Math.max(1, Math.floor(round || 1));
+    if (r % 3 === 1 && r > 1) {
+      slotRerollCount += 1;
+      slotKeepCount += 1;
+    }
+    if (r === 1) {
+      slotRerollCount = 1;
+      slotKeepCount = 1;
+    }
+
+    slotPendingRound = r;
+    slotResults = null;
+
+    if (slotSymbol1) slotSymbol1.textContent = '?';
+    if (slotSymbol2) slotSymbol2.textContent = '?';
+    if (slotSymbol3) slotSymbol3.textContent = '?';
+    if (slotValue1) slotValue1.textContent = '';
+    if (slotValue2) slotValue2.textContent = '';
+    if (slotValue3) slotValue3.textContent = '';
+    slotSpinning = false;
+    updateSlotButtons();
+
+    if (slotOverlay) slotOverlay.classList.remove('hidden');
+    updateSlotCounters();
+  }
+
+  function wireSlotUi(api) {
+    if (slotUiWired) return;
+    slotUiWired = true;
+    ensureSlotRefs();
+    if (slotSpinBtn) slotSpinBtn.addEventListener('click', () => {
+      if (api.state.phase !== 'slot') return;
+      spinSlotsAnimated();
+      api.updateHUD();
+    });
+    if (slotRerollBtn) slotRerollBtn.addEventListener('click', () => {
+      if (api.state.phase !== 'slot') return;
+      if (slotRerollCount <= 0) return;
+      if (slotSpinning) return;
+      slotRerollCount--;
+      slotResults = null;
+      updateSlotButtons();
+      updateSlotCounters();
+      spinSlotsAnimated();
+      api.updateHUD();
+    });
+    if (slotKeepBtn) slotKeepBtn.addEventListener('click', () => {
+      if (api.state.phase !== 'slot') return;
+      if (slotKeepCount <= 0 || !slotKeptResults) return;
+      slotKeepCount--;
+      slotResults = { ...slotKeptResults };
+      renderSlotResult(slotSymbol1, slotValue1, slotResults.dmg);
+      renderSlotResult(slotSymbol2, slotValue2, slotResults.fire);
+      renderSlotResult(slotSymbol3, slotValue3, slotResults.hp);
+      updateSlotButtons();
+      updateSlotCounters();
+      api.updateHUD();
+    });
+    if (slotStartBtn) slotStartBtn.addEventListener('click', () => {
+      if (api.state.phase !== 'slot') { return; }
+      if (!slotResults) { return; }
+      applySlotBonuses(api);
+      hideSlots();
+      const r = Math.max(1, Math.floor(slotPendingRound || api.state.round || 1));
+      api.spawnRound(r);
+      api.state.phase = 'playing';
+      api.updateHUD();
+    });
+  }
+
   function ensureHudRefs() {
     hud.abilitiesRoot = document.getElementById('chanceAbilitiesHud');
     hud.coinRing = document.getElementById('chanceAbilityHud');
@@ -96,6 +375,20 @@
     }
 
     if (!show) return;
+
+    ensureSlotRefs();
+    if (slotRollsEl) {
+      slotRollsEl.classList.remove('hidden');
+      if (slotResults) {
+        if (hudRollDmg) hudRollDmg.textContent = '⚔️' + (slotResults.dmg || 0);
+        if (hudRollFire) hudRollFire.textContent = '⚡' + (slotResults.fire || 0);
+        if (hudRollHp) hudRollHp.textContent = '❤️' + (slotResults.hp || 0);
+      } else {
+        if (hudRollDmg) hudRollDmg.textContent = '⚔️?';
+        if (hudRollFire) hudRollFire.textContent = '⚡?';
+        if (hudRollHp) hudRollHp.textContent = '❤️?';
+      }
+    }
 
     if (hud.coinNum && hud.coinRing) {
       const coinT = clamp(s.coinCd || 0, 0, CHANCE_COIN_COOLDOWN);
@@ -176,6 +469,32 @@
       return true;
     }
     return false;
+  }
+
+  function onBeginRound(api, round) {
+    wireSlotUi(api);
+    restoreSlotBonusesIfAny(api);
+    api.state.phase = 'slot';
+    showSlots(round);
+    api.updateHUD();
+    return true;
+  }
+
+  function onRoundCleared(api) {
+    restoreSlotBonusesIfAny(api);
+    hideSlots();
+  }
+
+  function getScreenShake(api) {
+    if (api.state.phase !== 'playing') return { x: 0, y: 0 };
+    const fireRate = 1 / Math.max(0.001, api.player.shotInterval);
+    const baseFireRate = 1 / 0.16;
+    const fireRateMult = fireRate / baseFireRate;
+    const shakeIntensity = Math.min(4, Math.max(0.5, (fireRateMult - 1) * 0.6));
+    const time = performance.now() / 25;
+    const x = Math.sin(time * 4) * shakeIntensity * 0.7 + (Math.random() - 0.5) * shakeIntensity * 0.8;
+    const y = Math.cos(time * 3.2) * shakeIntensity * 0.7 + (Math.random() - 0.5) * shakeIntensity * 0.8;
+    return { x, y };
   }
 
   function tryCoinFlip(api) {
@@ -561,15 +880,18 @@
     name: 'Chance',
     color: '#ff3b3b',
     hpColor: '#ffffff',
-    init: (api) => { ensureHudRefs(); reset(api); },
+    init: (api) => { ensureHudRefs(); ensureSlotRefs(); wireSlotUi(api); reset(api); },
     reset: (api) => reset(api),
     recharge: (api) => recharge(api),
     update: (api, dt) => update(api, dt),
     updateHud: (api) => updateHud(api),
+    onBeginRound: (api, round) => onBeginRound(api, round),
+    onRoundCleared: (api) => onRoundCleared(api),
     onKeyDown: (api, e) => onKeyDown(api, e),
     fire: (api) => fire(api),
     drawBullet: (api, b, ctx) => drawBullet(api, b, ctx),
     postDraw: (api, ctx) => postDraw(api, ctx),
+    getScreenShake: (api) => getScreenShake(api),
     getMoveSpeedMult: () => getMoveSpeedMult(),
     getDamageTakenMult: () => getDamageTakenMult(),
     isInvincible: () => isInvincible(),
